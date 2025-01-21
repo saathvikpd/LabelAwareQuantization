@@ -4,7 +4,7 @@ def generate_subset(n_classes, dist_matrix_path = "./cifar100_kl_div_matrix.npy"
 
     assert n_classes > 1
 
-    print(f"SIM_CLASSES_TYPE: {type(similar_classes)}")
+    print(f"SIMILARITY: {similar_classes}\nType: {type(similar_classes)}")
 
     kls_cf_matrix = np.load(dist_matrix_path)
     class_names = np.load(class_names_path)
@@ -33,4 +33,4 @@ def generate_subset(n_classes, dist_matrix_path = "./cifar100_kl_div_matrix.npy"
         for j in range(i + 1, len(selected_classes)):
             subset_dists += [kls_cf_matrix[selected_classes[i], selected_classes[j]]]
     
-    return {"classes": [class_names[class_id] for class_id in subset_classes], "max_dist": max(subset_dists), "avg_dist": np.mean(subset_dists)}
+    return {"classes": subset_classes, "max_dist": max(subset_dists), "avg_dist": np.mean(subset_dists)}

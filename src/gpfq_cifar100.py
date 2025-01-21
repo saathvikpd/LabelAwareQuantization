@@ -17,7 +17,7 @@ CONV2D_MODULE_TYPE = nn.Conv2d
 RESULT_LOGGING_DIR = 'result_logging'
 LAYER_LOGGING = False
 
-model = torch.hub.load("chenyaofo/pytorch-cifar-models", "cifar10_resnet20", pretrained=True)
+# model = torch.hub.load("chenyaofo/pytorch-cifar-models", "cifar100_resnet20", pretrained=True)
 
 class QuantizeNeuralNet:
     '''

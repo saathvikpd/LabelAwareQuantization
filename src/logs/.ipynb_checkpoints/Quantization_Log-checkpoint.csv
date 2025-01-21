@@ -1,0 +1,1 @@
+model,dataset,batch_size,original_top1,quantized_top1,original_top5,quantized_top5,bits,mlp_scalar,cnn_scalar,mlp_percentile,cnn_percentile,stochastic,regularizer,lamb,original_sparsity,quantized_sparsity,retain_rate,fusion,seed,similarity,num_classes,classes,max_KL_dist,avg_KL_dist

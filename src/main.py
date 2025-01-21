@@ -12,6 +12,8 @@ import torch.nn as nn
 from cifar100_subset_generation import generate_subset
 
 LOG_FILE_NAME = 'logs/Quantization_Log.csv'
+CLASS_NAMES_PATH = "./cifar100_class_names.npy"
+CLASS_NAMES = np.load(CLASS_NAMES_PATH)
 
 # hyperparameter section
 parser = argparse.ArgumentParser(description='Quantization algorithms in the paper')
@@ -40,7 +42,7 @@ parser.add_argument('--ignore_layer', '-ig', default=[], type=int, nargs='+',
                     help='indices of unquantized layers')
 parser.add_argument('-seed', default=0, type=int, help='set random seed')
 parser.add_argument('--fusion', '-f', action='store_true', help='fusing CNN and BN layers')
-parser.add_argument('--similar', '-sim', default=True, type=bool, help='indicate if subset is similar or dissimilar')
+parser.add_argument('--similar', '-sim', default=[1], type=int, help='indicate if subset is similar or dissimilar')
 parser.add_argument('--num_classes', '-n', default=[15], type=int, help='determine number of classes in subset')
 parser.add_argument('--model', '-m', default='resnet_20', help='model name')
 parser.add_argument('--cifar100_model', '-c100_m', default='../models/cifar100_resnet20-23dac2f1.pt', type=str, help='pretrained cifar100 network')
@@ -84,7 +86,8 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     print(f'Quantizing {args.model} on {device} with\n\t  dataset: {args.data_set}, bits: {bits}, mlp_scalar: {mlp_scalar}, cnn_scalar: {cnn_scalar}, mlp_percentile: {mlp_percentile}, \
         \n\tcnn_percentile: {cnn_percentile}, retain_rate: {args.retain_rate}, batch_size: {batch_size}\n')
 
-    classes_of_interest = generate_subset(args.num_classes, similar_classes=args.similar)['classes']
+    subset_dict = generate_subset(args.num_classes, similar_classes=args.similar)
+    classes_of_interest = subset_dict['classes']
     
     # load the data loader for training and testing
     train_loader, test_loader = data_loader(args.data_set, batch_size, args.num_worker, classes_of_interest)
@@ -125,19 +128,20 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
 
     topk = (1, 5)   # top-1 and top-5 accuracy
     
-
     print(f'\nEvaluting the original model to get its accuracy\n')
     original_topk_accuracy = test_accuracy(model, test_loader, device, topk)
 
-    print(f'Top-1 accuracy of {args.model} with classes {classes_of_interest} is {original_topk_accuracy[0]}.')
-    print(f'Top-5 accuracy of {args.model} with classes {classes_of_interest} is {original_topk_accuracy[1]}.')
+    subset_classes_names = [CLASS_NAMES[class_id] for class_id in classes_of_interest]
+
+    print(f'Top-1 accuracy of {args.model} with classes {subset_classes_names} is {original_topk_accuracy[0]}.')
+    print(f'Top-5 accuracy of {args.model} with classes {subset_classes_names} is {original_topk_accuracy[1]}.')
     
     start_time = datetime.now()
 
     print(f'\n Evaluting the quantized model to get its accuracy\n')
     topk_accuracy = test_accuracy(quantized_model, test_loader, device, topk)
-    print(f'Top-1 accuracy of quantized {args.model} with data {classes_of_interest} is {topk_accuracy[0]}.')
-    print(f'Top-5 accuracy of quantized {args.model} with data {classes_of_interest} is {topk_accuracy[1]}.')
+    print(f'Top-1 accuracy of quantized {args.model} with data {subset_classes_names} is {topk_accuracy[0]}.')
+    print(f'Top-5 accuracy of quantized {args.model} with data {subset_classes_names} is {topk_accuracy[1]}.')
 
     end_time = datetime.now()
 
@@ -157,7 +161,9 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
             bits, mlp_scalar, cnn_scalar, 
             mlp_percentile, cnn_percentile, stochastic,
             args.regularizer, lamb, original_sparsity, quantized_sparsity,
-            args.retain_rate, args.fusion, args.seed
+            args.retain_rate, args.fusion, args.seed,
+            args.similar,args.num_classes,subset_classes_names,
+            subset_dict['max_dist'],subset_dict['avg_dist']
         ]
         csv_writer.writerow(row)
 

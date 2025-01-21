@@ -63,7 +63,7 @@ def data_loader(ds_name, batch_size, num_workers, classes_of_interest):
 
         train_ds = torchvision.datasets.CIFAR100(root=data_dir, train=True, download=True, 
             transform=transform_train)
-        
+
         test_ds = torchvision.datasets.CIFAR100(root=data_dir, train=False, download=True, 
             transform=transform_test)
 
@@ -74,11 +74,15 @@ def data_loader(ds_name, batch_size, num_workers, classes_of_interest):
             
         train_ds_filtered = filter_classes(train_ds, classes_of_interest)
         test_ds_filtered = filter_classes(test_ds, classes_of_interest)
+
+        # Check if the subsets are empty
+        if len(train_ds_filtered) == 0 or len(test_ds_filtered) == 0:
+            raise ValueError("Filtered dataset is empty. Check 'classes_of_interest' and dataset labels.")
         
-        train_dl = DataLoader(train_ds, shuffle=True, batch_size=batch_size,
+        train_dl = DataLoader(train_ds_filtered, shuffle=True, batch_size=batch_size,
                               num_workers=num_workers, worker_init_fn=seed_worker, generator=g)
         
-        test_dl = DataLoader(test_ds, shuffle=False, batch_size=min(batch_size, 1024),
+        test_dl = DataLoader(test_ds_filtered, shuffle=False, batch_size=min(batch_size, 1024),
                              num_workers=num_workers)
 
     else:
