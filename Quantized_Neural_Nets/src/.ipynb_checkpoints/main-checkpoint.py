@@ -91,7 +91,7 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     elif args.data_set == 'CIFAR100':
         model = timm.create_model("hf_hub:anonauthors/cifar100-timm-resnet50", pretrained=True)
 
-        original_accuracy_table = {'resnet50': (.8262, .9673)}
+        original_accuracy_table = {}
 # ======================================================================================================================================
 
     

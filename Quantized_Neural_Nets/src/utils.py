@@ -70,6 +70,8 @@ def test_accuracy(model, test_dl, device, topk=(1, )):
         for i, k in enumerate(topk):
             topk_count[i, j] = correct_mat[:, :k].reshape(-1).sum().item()
 
+    
+
     topk_accuracy = topk_count.sum(axis=1) / len(test_dl.dataset)
     return topk_accuracy
 
