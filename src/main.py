@@ -11,7 +11,7 @@ from data_loaders import data_loader
 import torch.nn as nn
 from cifar100_subset_generation import generate_subset
 
-LOG_FILE_NAME = 'logs/Quantization_Log.csv'
+LOG_FILE_NAME = 'logs/Quantization_Log_Random.csv'
 CLASS_NAMES_PATH = "./cifar100_class_names.npy"
 CLASS_NAMES = np.load(CLASS_NAMES_PATH)
 
@@ -60,12 +60,16 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     lamb = l
     stochastic = args.stochastic_quantization
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    subset_dict = generate_subset(args.num_classes)
+    classes_of_interest = subset_dict['classes']
+    print(f"CLASS NAMES: {classes_of_interest}")
     
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
     # load the model to be quantized
-    model = torch.hub.load("chenyaofo/pytorch-cifar-models", "cifar100_resnet20", pretrained=True)
+    model = torch.hub.load("chenyaofo/pytorch-cifar-models", "cifar100_mobilenetv2_x0_75", pretrained=True)
     original_accuracy_table = {}
     
     model.to(device)  
@@ -86,15 +90,15 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     print(f'Quantizing {args.model} on {device} with\n\t  dataset: {args.data_set}, bits: {bits}, mlp_scalar: {mlp_scalar}, cnn_scalar: {cnn_scalar}, mlp_percentile: {mlp_percentile}, \
         \n\tcnn_percentile: {cnn_percentile}, retain_rate: {args.retain_rate}, batch_size: {batch_size}\n')
 
-    subset_dict = generate_subset(args.num_classes, similar_classes=args.similar)
-    classes_of_interest = subset_dict['classes']
+    # subset_dict = generate_subset(args.num_classes, similar_classes=args.similar)
+    # classes_of_interest = subset_dict['classes']
     
     # load the data loader for training and testing
-    train_loader, test_loader = data_loader(args.data_set, batch_size, args.num_worker, classes_of_interest)
+    subset_train_loader, subset_test_loader = data_loader(args.data_set, batch_size, args.num_worker, classes_of_interest)
     
     # quantize the neural net
-    quantizer = QuantizeNeuralNet(model, args.model, batch_size, 
-                                    train_loader, 
+    subset_quantizer = QuantizeNeuralNet(model, args.model, batch_size, 
+                                    subset_train_loader, 
                                     mlp_bits=bits,
                                     cnn_bits=bits,
                                     ignore_layers=args.ignore_layer,
@@ -109,9 +113,34 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
                                     device = device
                                     )
     start_time = datetime.now()
-    quantized_model = quantizer.quantize_network()
+    subset_quantized_model = subset_quantizer.quantize_network()
     end_time = datetime.now()
-    quantized_model = quantized_model.to(device)
+    subset_quantized_model = subset_quantized_model.to(device)
+
+    print(f'\nTime used for quantization: {end_time - start_time}\n')
+
+    all_train_loader, all_test_loader = data_loader(args.data_set, batch_size, args.num_worker, classes_of_interest)
+    
+    # quantize the neural net
+    all_quantizer = QuantizeNeuralNet(model, args.model, batch_size, 
+                                    all_train_loader, 
+                                    mlp_bits=bits,
+                                    cnn_bits=bits,
+                                    ignore_layers=args.ignore_layer,
+                                    mlp_alphabet_scalar=mlp_scalar,
+                                    cnn_alphabet_scalar=cnn_scalar,
+                                    mlp_percentile=mlp_percentile,
+                                    cnn_percentile=cnn_percentile,
+                                    reg = args.regularizer, 
+                                    lamb=lamb,
+                                    retain_rate=args.retain_rate,
+                                    stochastic_quantization=stochastic,
+                                    device = device
+                                    )
+    start_time = datetime.now()
+    all_quantized_model = all_quantizer.quantize_network()
+    end_time = datetime.now()
+    all_quantized_model = all_quantized_model.to(device)
 
     print(f'\nTime used for quantization: {end_time - start_time}\n')
 
@@ -124,12 +153,12 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     saved_model_dir = '../quantized_models/'+args.model
     if not os.path.isdir(saved_model_dir):
         os.mkdir(saved_model_dir)
-    torch.save(quantized_model, os.path.join(saved_model_dir, saved_model_name))
+    torch.save(subset_quantized_model, os.path.join(saved_model_dir, saved_model_name))
 
     topk = (1, 5)   # top-1 and top-5 accuracy
     
     print(f'\nEvaluting the original model to get its accuracy\n')
-    original_topk_accuracy = test_accuracy(model, test_loader, device, topk)
+    original_topk_accuracy = test_accuracy(model, subset_test_loader, device, topk)
 
     subset_classes_names = [CLASS_NAMES[class_id] for class_id in classes_of_interest]
 
@@ -138,29 +167,41 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     
     start_time = datetime.now()
 
-    print(f'\n Evaluting the quantized model to get its accuracy\n')
-    topk_accuracy = test_accuracy(quantized_model, test_loader, device, topk)
-    print(f'Top-1 accuracy of quantized {args.model} with data {subset_classes_names} is {topk_accuracy[0]}.')
-    print(f'Top-5 accuracy of quantized {args.model} with data {subset_classes_names} is {topk_accuracy[1]}.')
+    print(f'\n Evaluting the SUBSET quantized model to get its accuracy\n')
+    subset_topk_accuracy = test_accuracy(subset_quantized_model, subset_test_loader, device, topk)
+    print(f'Top-1 accuracy of quantized {args.model} with classes {subset_classes_names} is {subset_topk_accuracy[0]}.')
+    print(f'Top-5 accuracy of quantized {args.model} with classes {subset_classes_names} is {subset_topk_accuracy[1]}.')
+
+    end_time = datetime.now()
+
+    print(f'\nTime used for evaluation: {end_time - start_time}\n')
+
+    start_time = datetime.now()
+
+    print(f'\n Evaluting the ALL quantized model to get its accuracy\n')
+    all_topk_accuracy = test_accuracy(all_quantized_model, subset_test_loader, device, topk)
+    print(f'Top-1 accuracy of quantized {args.model} with classes {subset_classes_names} is {all_topk_accuracy[0]}.')
+    print(f'Top-5 accuracy of quantized {args.model} with classes {subset_classes_names} is {all_topk_accuracy[1]}.')
 
     end_time = datetime.now()
 
     print(f'\nTime used for evaluation: {end_time - start_time}\n')
     
     original_sparsity = eval_sparsity(model)
-    quantized_sparsity = eval_sparsity(quantized_model)
+    subset_quantized_sparsity = eval_sparsity(subset_quantized_model)
+    all_quantized_sparsity = eval_sparsity(all_quantized_model)
     
-    print("Sparsity: Org: {}, Quant: {}".format(original_sparsity, quantized_sparsity))
+    print("Sparsity: Org: {}, Subset_Quant: {}, All_Quant".format(original_sparsity, subset_quantized_sparsity, all_quantized_sparsity))
     # store the validation accuracy and parameter settings
     with open(LOG_FILE_NAME, 'a') as f:
         csv_writer = csv.writer(f)
         row = [
             args.model, args.data_set, batch_size, 
-            original_topk_accuracy[0], topk_accuracy[0], 
-            original_topk_accuracy[1], topk_accuracy[1], 
+            original_topk_accuracy[0], subset_topk_accuracy[0], all_topk_accuracy[0], 
+            original_topk_accuracy[1], subset_topk_accuracy[1], all_topk_accuracy[1], 
             bits, mlp_scalar, cnn_scalar, 
             mlp_percentile, cnn_percentile, stochastic,
-            args.regularizer, lamb, original_sparsity, quantized_sparsity,
+            args.regularizer, lamb, original_sparsity, subset_quantized_sparsity, all_quantized_sparsity, 
             args.retain_rate, args.fusion, args.seed,
             args.similar,args.num_classes,subset_classes_names,
             subset_dict['max_dist'],subset_dict['avg_dist']

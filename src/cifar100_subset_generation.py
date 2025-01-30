@@ -1,6 +1,6 @@
 import numpy as np
 
-def generate_subset(n_classes, dist_matrix_path = "./cifar100_kl_div_matrix.npy", class_names_path = "./cifar100_class_names.npy", similar_classes = True):
+def generate_subset_by_sim(n_classes, dist_matrix_path = "./cifar100_kl_div_matrix.npy", class_names_path = "./cifar100_class_names.npy", similar_classes = True):
 
     assert n_classes > 1
 
@@ -34,3 +34,28 @@ def generate_subset(n_classes, dist_matrix_path = "./cifar100_kl_div_matrix.npy"
             subset_dists += [kls_cf_matrix[selected_classes[i], selected_classes[j]]]
     
     return {"classes": subset_classes, "max_dist": max(subset_dists), "avg_dist": np.mean(subset_dists)}
+
+def generate_subset(n_classes, 
+                    dist_matrix_path = "./cifar100_kl_div_matrix.npy", 
+                    class_names_path = "./cifar100_class_names.npy"):
+    
+    assert n_classes > 1
+    kls_cf_matrix = np.load(dist_matrix_path)
+    class_names = np.load(class_names_path)
+
+    # rand_class_ind = np.random.randint(0, class_names.shape[0], n_classes)
+    rand_class_ind = np.random.choice(class_names.shape[0], size=10, replace=False)
+    rand_class_name = [class_names[i] for i in rand_class_ind]
+
+    subset_dists = []
+    subset_classes = []
+    for i in range(len(rand_class_ind)):
+        for j in range(i + 1, len(rand_class_ind)):
+            subset_dists += [kls_cf_matrix[rand_class_ind[i], rand_class_ind[j]]]
+    
+    return {"classes": rand_class_ind, "max_dist": max(subset_dists), "avg_dist": np.mean(subset_dists)}
+    
+    
+
+
+

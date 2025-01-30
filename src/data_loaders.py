@@ -42,7 +42,7 @@ class Imagenet(Dataset):
         return x, y
 
 
-def data_loader(ds_name, batch_size, num_workers, classes_of_interest): 
+def data_loader(ds_name, batch_size, num_workers, classes_of_interest=[i for i in range(100)]): 
     """
     Prepare data loaders
     """
