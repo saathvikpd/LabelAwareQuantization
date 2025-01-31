@@ -28,7 +28,7 @@ def generate_subset(n_classes, dist_matrix_path = "./cifar100_kl_div_matrix.npy"
         
         selected_classes = list(selected_classes)
     else:
-        selected_classes = np.random.randint(0, class_names.shape[0], n_classes)
+        selected_classes = np.random.default_rng().choice(class_names.shape[0], size = n_classes, replace = False)
     
     subset_dists = []
     subset_classes = []

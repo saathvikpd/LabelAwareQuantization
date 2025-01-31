@@ -198,7 +198,7 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
                 args.regularizer, lamb, original_sparsity, quantized_sparsity,
                 args.retain_rate, args.fusion, args.seed, subset_info["classes"],
                 list(map(lambda x: class_names[x].item(), subset_info["classes"])),
-                subset_info["max_dist"], subset_info["min_dist"], subset_info["avg_dist"]
+                subset_info["max_dist"], subset_info["min_dist"], subset_info["avg_dist"], False
             ]
             csv_writer.writerow(row)
     else:
