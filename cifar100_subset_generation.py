@@ -12,10 +12,7 @@ def generate_subset(n_classes, dist_matrix_path = "./cifar100_kl_div_matrix.npy"
     
     selected_classes = {rand_class_ind}
     for _ in range(n_classes - 1):
-        if similar_classes:
-            sorted_classes = np.argsort(kls_cf_matrix[list(selected_classes)].mean(axis = 0))
-        else:
-            sorted_classes = np.argsort(kls_cf_matrix[list(selected_classes)].mean(axis = 0))[::-1]
+        sorted_classes = np.argsort(kls_cf_matrix[list(selected_classes)].mean(axis = 0))[::-1]
         i = 0
         while sorted_classes[i] in selected_classes:
             i += 1
