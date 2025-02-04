@@ -88,12 +88,18 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
         original_accuracy_table = {}
 
 # ======================================================================================================================================
-    elif args.data_set == 'CIFAR100':
+    elif args.data_set == 'CIFAR100' and args.model == 'resnet50':
         model = timm.create_model("hf_hub:anonauthors/cifar100-timm-resnet50", pretrained=True)
 
         original_accuracy_table = {}
 # ======================================================================================================================================
 
+# Adding new model --- CHANGE CODE BELOW:
+    elif args.data_set == 'CIFAR100' and args.model == '<INSERT MODEL NAME>':
+
+        model = timm.create_model("<INSERT CIFAR100-PRETRAINED HF MODEL>", pretrained=True)
+
+        original_accuracy_table = {}
     
     model.to(device)  
     model.eval()  # turn on the evaluation mode
