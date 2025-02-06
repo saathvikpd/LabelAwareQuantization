@@ -1,4 +1,4 @@
-# LabelAwareQuantization
+# Label-Aware Quantization
 
 This repository contains the code and resources for the DSC180 Capstone Project on Label-Aware Quantization. The project focuses on exploring post-training quantization techniques in neural networks with an emphasis on label awareness.
 
