@@ -5,6 +5,8 @@ This repository contains the code and resources for the DSC180 Capstone Project 
 ## Repository Structure
 
 - `Quantized_Neural_Nets/`: Directory containing code and scripts related to quantized neural networks.
+     - `Quantized_Neural_Nets/src/plots/`: Plots from experiments
+     - `Quantized_Neural_Nets/src/testing.ipynb/`: Juypter notebook to run experiments and generate plots
 - `Class Embeddings & KL Divergence.ipynb`: Jupyter notebook analyzing class embeddings and Kullback-Leibler (KL) divergence.
 - `cifar100_class_names.npy`: NumPy array file containing the class names for the CIFAR-100 dataset.
 - `cifar100_kl_div_matrix.npy`: NumPy array file containing the KL divergence matrix for CIFAR-100 classes.
@@ -14,7 +16,7 @@ This repository contains the code and resources for the DSC180 Capstone Project 
 
 ### Objective
 
-The primary objective of this experiment is to investigate the impact of label-aware quantization on neural network performance, particularly focusing on how class embeddings and the relationships between classes as measured by KL divergence impact quantization.
+The primary objective of this experiment is to investigate the impact of label-aware quantization on neural network performance, particularly focusing on how class embeddings and the relationships between classes as measured by KL divergence impact quantization. Intuitively, subsets with a larger median distance between classes will be easier tasks, so quantization should not impact performance as much as with highly homogeneous subsets.
 
 ### Data
 
@@ -30,8 +32,22 @@ The experiments utilize the CIFAR-100 dataset, which consists of 100 classes wit
    - Employ the `cifar100_subset_generation.py` script to create subsets of the CIFAR-100 dataset based on specific criteria, such as selecting classes with high or low KL divergence.
 
 3. **Quantized Neural Networks**:
-   - Explore the `Quantized_Neural_Nets/` directory for experiments and results on how subset homogeneity (measured by KL) impacts GPFQ Quantization of CNNs.
+   - Explore the `Quantized_Neural_Nets/src/testing.ipynb` notebook for experiments and results on how subset homogeneity (measured by KL) impacts GPFQ Quantization of CNNs.
    - Train and evaluate quantized models on the original and subset datasets to assess performance impacts.
+  
+### Sample Result
+
+All experiments:
+- 10 classes per subset
+- Classes selected from CIFAR100
+
+Plot description:
+1. Quantized model curve: ResNet-50 pre-trained on CIFAR100 quantized down to 4 bits using GPFQ
+2. Original model curve: ResNet-50 pre-trained on CIFAR100
+3. Fine-tuned model curve: ResNet-50 pre-trained on CIFAR100 and fine-tuned on subset
+
+
+
 
 ### Requirements
 
