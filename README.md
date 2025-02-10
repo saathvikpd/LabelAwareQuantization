@@ -37,6 +37,8 @@ The experiments utilize the CIFAR-100 dataset, which consists of 100 classes wit
   
 ### Sample Result
 
+![Plot unavailable](https://github.com/saathvikpd/LabelAwareQuantization/blob/main/Quantized_Neural_Nets/src/plots/resnet50_median.png)
+
 All experiments:
 - 10 classes per subset
 - Classes selected from CIFAR100
@@ -45,10 +47,6 @@ Plot description:
 1. Quantized model curve: ResNet-50 pre-trained on CIFAR100 quantized down to 4 bits using GPFQ
 2. Original model curve: ResNet-50 pre-trained on CIFAR100
 3. Fine-tuned model curve: ResNet-50 pre-trained on CIFAR100 and fine-tuned on subset
-
-![Plot unavailable](https://github.com/saathvikpd/LabelAwareQuantization/blob/main/Quantized_Neural_Nets/src/plots/resnet50_median.png)
-
-
 
 ### Requirements
 
