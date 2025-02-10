@@ -80,7 +80,7 @@ Plot description:
     Function Parameters:
    - model: Model name (pulls pre-trained model from hugging-face)
    - b: Bit width or precision-level
-   - bs: => Batch size
+   - bs: Batch size
    - s: Scalar C used to determine the radius of alphabets
    - ds: Dataset (only CIFAR100 used for our experiments)
    - sn: Subset size
