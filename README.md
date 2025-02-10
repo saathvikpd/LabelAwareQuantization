@@ -54,6 +54,7 @@ Plot description:
 
 - Python 3.x
 - NumPy
+- PyTorch
 - Jupyter Notebook
 - Additional libraries as specified in individual scripts or notebooks
 
