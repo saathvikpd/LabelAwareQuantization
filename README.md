@@ -2,7 +2,7 @@
 
 Contributors: Saathvik Dirisala, Jessica Hung, Ari Juljulian, Yijun Luo
 
-This repository contains the code and resources for the DSC180 Capstone Project on Label-Aware Quantization. The project focuses on exploring post-training quantization techniques in neural networks with an emphasis on label awareness. We used the GPFQ Quantization framework /(https://github.com/YixuanSeanZhou/Quantized_Neural_Nets)/ and altered it for our experiments.
+This repository contains the code and resources for the DSC180 Capstone Project on Label-Aware Quantization. The project focuses on exploring post-training quantization techniques in neural networks with an emphasis on label awareness. We used the GPFQ Quantization framework (https://github.com/YixuanSeanZhou/Quantized_Neural_Nets) and altered it for our experiments.
 
 ## Repository Structure
 
@@ -82,6 +82,6 @@ Plot description:
    - b: Bit width or precision-level
    - bs: => Batch size
    - s: Scalar C used to determine the radius of alphabets
-   - ds: Dataset /(only CIFAR100 used for our experiments/)
+   - ds: Dataset (only CIFAR100 used for our experiments)
    - sn: Subset size
-   - sc: Class similarity level for random subset generation /('True': very similar, 'False': very dissimilar, 'None': random/)
+   - sc: Class similarity level for random subset generation ('True': very similar, 'False': very dissimilar, 'None': random)
