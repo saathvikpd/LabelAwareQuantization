@@ -7,13 +7,14 @@ This repository contains the code and resources for the DSC180 Capstone Project 
 ## Repository Structure
 
 - `Quantized_Neural_Nets/`: Directory containing code and scripts related to quantized neural networks.
-     - `Quantized_Neural_Nets/src/plots/`: Plots from experiments
-     - `Quantized_Neural_Nets/src/testing.ipynb/`: Juypter notebook to run experiments and generate plots
+- `Quantized_Neural_Nets/src/`: 
+     - `plots/`: Plots from experiments
+     - `testing.ipynb/`: Juypter notebook to run experiments and generate plots
+     - `cifar100_class_names.npy`: NumPy array file containing the class names for the CIFAR-100 dataset.
+     - `cifar100_kl_div_matrix.npy`: NumPy array file containing the KL divergence matrix for CIFAR-100 classes.
+     - `cifar100_subset_generation.py`: Python script for generating subsets of the CIFAR-100 dataset.
 - `Class Embeddings & KL Divergence.ipynb`: Jupyter notebook analyzing class embeddings and Kullback-Leibler (KL) divergence.
-- `cifar100_class_names.npy`: NumPy array file containing the class names for the CIFAR-100 dataset.
-- `cifar100_kl_div_matrix.npy`: NumPy array file containing the KL divergence matrix for CIFAR-100 classes.
-- `cifar100_subset_generation.py`: Python script for generating subsets of the CIFAR-100 dataset.
-
+ 
 ## Experimental Setup
 
 ### Objective
