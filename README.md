@@ -46,6 +46,7 @@ Plot description:
 2. Original model curve: ResNet-50 pre-trained on CIFAR100
 3. Fine-tuned model curve: ResNet-50 pre-trained on CIFAR100 and fine-tuned on subset
 
+![Plot unavailable](https://github.com/saathvikpd/LabelAwareQuantization/blob/main/Quantized_Neural_Nets/src/plots/resnet50_median.png)
 
 
 
