@@ -61,3 +61,23 @@ Plot description:
    ```bash
    git clone https://github.com/saathvikpd/LabelAwareQuantization.git
    cd LabelAwareQuantization
+   ```
+
+2. **Install Requirements**:
+   ```bash
+   cd ./Quantized_Neural_Nets
+   pip install -r requirements.txt
+   ```
+
+3. **Run Experiment**:
+    ```bash
+   python main.py -model 'resnet50' -b 4 -bs 64 -s 1.16 -ds 'CIFAR100' -sn 10 -sc 'False'
+   ```
+    Function Parameters:
+   - model: Model name (pulls pre-trained model from hugging-face)
+   - b: Bit width or precision-level
+   - bs: => Batch size
+   - s: Scalar C used to determine the radius of alphabets
+   - ds: Dataset /(only CIFAR100 used for our experiments/)
+   - sn: Subset size
+   - sc: Class similarity level for random subset generation /('True': very similar, 'False': very dissimilar, 'None': random/)
