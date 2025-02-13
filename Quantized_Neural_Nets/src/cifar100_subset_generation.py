@@ -38,4 +38,4 @@ def generate_subset(n_classes, dist_matrix_path = "./cifar100_kl_div_matrix.npy"
         for j in range(i + 1, len(selected_classes)):
             subset_dists += [kls_cf_matrix[selected_classes[i], selected_classes[j]]]
     
-    return {"classes": subset_classes, "max_dist": max(subset_dists), "min_dist": min(subset_dists), "avg_dist": np.mean(subset_dists)}
+    return {"classes": subset_classes, "max_dist": max(subset_dists), "min_dist": min(subset_dists), "avg_dist": np.mean(subset_dists), "median_dist": np.median(subset_dists)}
