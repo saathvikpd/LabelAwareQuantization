@@ -9,12 +9,12 @@ import timm
 import argparse
 from datetime import datetime
 from quantize_neural_net import QuantizeNeuralNet
-from utils import test_accuracy, eval_sparsity, fusion_layers_inplace, get_all_layers
+from utils import test_accuracy, eval_sparsity, fusion_layers_inplace, get_all_layers, test_accuracy_sub, finetune_model
 from data_loaders import data_loader
 from cifar100_subset_generation import generate_subset, class_names
+import pandas as pd
 
 LOG_FILE_NAME = '../logs/Quantization_Log.csv'
-LOG_FILE_SUB_NAME = '../logs/Quantization_Log_Subsets.csv'
 
 # hyperparameter section
 parser = argparse.ArgumentParser(description='Quantization algorithms in the paper')
@@ -50,6 +50,7 @@ parser.add_argument('--fusion', '-f', action='store_true', help='fusing CNN and 
 args = parser.parse_args()
 args.similar_classes = True if args.similar_classes == "True" else (False if args.similar_classes == "False" else None)
 
+LOG_FILE_SUB_NAME = f'../logs/Quantization_Log_{args.model}.csv'
 
 def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     batch_size = bs  
@@ -61,6 +62,9 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     lamb = l
     stochastic = args.stochastic_quantization
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    num_epochs = 5  # Set the number of fine-tuning epochs
+    learning_rate = 1e-4  # Fine-tuning learning rate
     
     # np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -89,7 +93,7 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
 
 # ======================================================================================================================================
     elif args.data_set == 'CIFAR100' and args.model == 'resnet50':
-        model = timm.create_model("hf_hub:anonauthors/cifar100-timm-resnet50", pretrained=True)
+        model_path = "hf_hub:anonauthors/cifar100-timm-resnet50"
 
         original_accuracy_table = {}
 # ======================================================================================================================================
@@ -97,9 +101,11 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
 # Adding new model --- CHANGE CODE BELOW:
     elif args.data_set == 'CIFAR100' and args.model == '<INSERT MODEL NAME>':
 
-        model = timm.create_model("<INSERT CIFAR100-PRETRAINED HF MODEL>", pretrained=True)
+        model_path = "<INSERT CIFAR100-PRETRAINED HF MODEL>"
 
         original_accuracy_table = {}
+
+    model = timm.create_model(model_path, pretrained=True)
     
     model.to(device)  
     model.eval()  # turn on the evaluation mode
@@ -171,26 +177,82 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     else:
         print(f'\nEvaluting the original model to get its accuracy\n')
         original_topk_accuracy = test_accuracy(model, test_loader, device, topk)
+        original_topk_accuracy_sub = test_accuracy_sub(model, test_loader, subset_info["classes"], device, topk)
     
-    print(f'Top-1 accuracy of {args.model} is {original_topk_accuracy[0]}.')
-    print(f'Top-5 accuracy of {args.model} is {original_topk_accuracy[1]}.')
+    print(f'Top-1 & Top-5 accuracies of {args.model} is {original_topk_accuracy[0]} & {original_topk_accuracy[1]}.')
+    print(f'Top-1 & Top-5 accuracies of {args.model}, picking from subset classes, is {original_topk_accuracy_sub[0]} & {original_topk_accuracy_sub[1]}.')
     
     start_time = datetime.now()
 
     print(f'\n Evaluting the quantized model to get its accuracy\n')
     topk_accuracy = test_accuracy(quantized_model, test_loader, device, topk)
-    print(f'Top-1 accuracy of quantized {args.model} is {topk_accuracy[0]}.')
-    print(f'Top-5 accuracy of quantized {args.model} is {topk_accuracy[1]}.')
+    topk_accuracy_sub = test_accuracy_sub(quantized_model, test_loader, subset_info["classes"], device, topk)
+    print(f'Top-1 & Top-5 accuracies of quantized {args.model} is {topk_accuracy[0]} & {topk_accuracy[1]}.')
+    print(f'Top-1 & Top-5 accuracies of quantized {args.model}, picking from subset classes, is {topk_accuracy_sub[0]} & {topk_accuracy_sub[1]}.')
 
     end_time = datetime.now()
 
     print(f'\nTime used for evaluation: {end_time - start_time}\n')
+
+    print(f'\nFine-tuning the original model on subset\n')
+    finetuned_model = finetune_model(model_path, train_loader, batch_size, num_epochs, learning_rate, device)
+
+    print(f'\nEvaluting the fine-tuned model to get its accuracy\n')
+    finetuned_topk_accuracy = test_accuracy(finetuned_model, test_loader, device, topk)
+    finetuned_topk_accuracy_sub = test_accuracy_sub(finetuned_model, test_loader, subset_info["classes"], device, topk)
+    print(f'Top-1 & Top-5 accuracies of fine-tuned {args.model} is {finetuned_topk_accuracy[0]} & {finetuned_topk_accuracy[1]}.')
+    print(f'Top-1 & Top-5 accuracies of fine-tuned {args.model}, picking from subset classes, is {finetuned_topk_accuracy_sub[0]} & {finetuned_topk_accuracy_sub[1]}.')
+
+    print(f'\nQuantizing the fine-tuned model on subset\n')
+    quantizer_finetuned = QuantizeNeuralNet(finetuned_model, args.model, batch_size, 
+                                    train_loader, 
+                                    mlp_bits=bits,
+                                    cnn_bits=bits,
+                                    ignore_layers=args.ignore_layer,
+                                    mlp_alphabet_scalar=mlp_scalar,
+                                    cnn_alphabet_scalar=cnn_scalar,
+                                    mlp_percentile=mlp_percentile,
+                                    cnn_percentile=cnn_percentile,
+                                    reg = args.regularizer, 
+                                    lamb=lamb,
+                                    retain_rate=args.retain_rate,
+                                    stochastic_quantization=stochastic,
+                                    device = device
+                                    )
+
+    quantized_finetuned_model = quantizer_finetuned.quantize_network()
+    quantized_finetuned_model = quantized_finetuned_model.to(device)
+
+    print(f'\n Evaluting the quantized + fine-tuned model to get its accuracy\n')
+    quant_ft_topk_accuracy = test_accuracy(quantized_finetuned_model, test_loader, device, topk)
+    quant_ft_topk_accuracy_sub = test_accuracy_sub(quantized_finetuned_model, test_loader, subset_info["classes"], device, topk)
+    print(f'Top-1 & Top-5 accuracies of quantized + fine-tuned {args.model} is {quant_ft_topk_accuracy[0]} & {quant_ft_topk_accuracy[1]}.')
+    print(f'Top-1 & Top-5 accuracies of quantized + fine-tuned {args.model}, picking from subset classes, is {quant_ft_topk_accuracy_sub[0]} & {quant_ft_topk_accuracy_sub[1]}.')
     
+
     original_sparsity = eval_sparsity(model)
     quantized_sparsity = eval_sparsity(quantized_model)
+    finetuned_sparsity = eval_sparsity(finetuned_model)
+    quantized_finetuned_sparsity = eval_sparsity(quantized_finetuned_model)
     
     print("Sparsity: Org: {}, Quant: {}".format(original_sparsity, quantized_sparsity))
     # store the validation accuracy and parameter settings
+
+    if not os.path.exists(LOG_FILE_SUB_NAME):
+        columns = ['Model Name', 'Dataset', 'Quantization Batch Size',
+       'Original Top1 Accuracy', 'Quantized Top1 Accuracy',
+       'Original Top5 Accuracy', 'Quantized Top5 Accuracy', 'Bits',
+       'MLP_Alphabet_Scalar', 'CNN_Alphabet_Scalar', 'MLP_Percentile',
+       'CNN_Percentile', 'Stochastic Quantization', 'Regularizer', 'Lambda',
+       'Original Sparsity', 'Quantized Sparsity', 'Retain_rate', 'Fusion',
+       'Seed', 'Subset_Inds', 'Subset_Classes', 'Max_KL', 'Min_KL', 'Avg_KL', 'Median_KL',
+       'Classes Repeated', 'Fine-Tuned Top1 Accuracy', 'Fine-Tuned Top5 Accuracy', 'Quant+FT Top1 Accuracy', 
+       'Quant+FT Top5 Accuracy', 'Original Top1 Accuracy (Pick Sub)', 'Original Top5 Accuracy (Pick Sub)', 
+       'Quantized Top1 Accuracy (Pick Sub)', 'Quantized Top5 Accuracy (Pick Sub)', 
+       'Fine-Tuned Top1 Accuracy (Pick Sub)', 'Fine-Tuned Top5 Accuracy (Pick Sub)',
+       'Quant+FT Top1 Accuracy (Pick Sub)', 'Quant+FT Top5 Accuracy (Pick Sub)', 'Fine-Tuned Sparsity', 'Quant+FT Sparsity']
+        df = pd.DataFrame(columns = columns)
+        df.to_csv(LOG_FILE_SUB_NAME, index = False)
 
     if args.subset_size is not None:
         with open(LOG_FILE_SUB_NAME, 'a') as f:
@@ -204,7 +266,13 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
                 args.regularizer, lamb, original_sparsity, quantized_sparsity,
                 args.retain_rate, args.fusion, args.seed, subset_info["classes"],
                 list(map(lambda x: class_names[x].item(), subset_info["classes"])),
-                subset_info["max_dist"], subset_info["min_dist"], subset_info["avg_dist"], False
+                subset_info["max_dist"], subset_info["min_dist"], subset_info["avg_dist"], 
+                subset_info["median_dist"], False, finetuned_topk_accuracy[0], 
+                finetuned_topk_accuracy[1], quant_ft_topk_accuracy[0], 
+                quant_ft_topk_accuracy[1], original_topk_accuracy_sub[0], original_topk_accuracy_sub[1], 
+                topk_accuracy_sub[0], topk_accuracy_sub[1], finetuned_topk_accuracy_sub[0], 
+                finetuned_topk_accuracy_sub[1], quant_ft_topk_accuracy_sub[0], quant_ft_topk_accuracy_sub[1],
+                finetuned_sparsity, quantized_finetuned_sparsity
             ]
             csv_writer.writerow(row)
     else:
