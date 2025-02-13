@@ -40,7 +40,7 @@ The experiments utilize the CIFAR-100 dataset, which consists of 100 classes wit
   
 ### Sample Result
 
-![Plot unavailable](https://github.com/saathvikpd/LabelAwareQuantization/blob/main/Quantized_Neural_Nets/src/plots/resnet50_4bit_median.png)
+![Plot unavailable](https://github.com/saathvikpd/LabelAwareQuantization/blob/main/Quantized_Neural_Nets/src/plots/resnet50_4bit_all_median.png)
 
 All experiments:
 - 10 classes per subset
