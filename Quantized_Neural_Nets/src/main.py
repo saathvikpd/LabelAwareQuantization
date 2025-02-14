@@ -99,9 +99,9 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
 
 # ======================================================================================================================================
     elif args.data_set == 'CIFAR100' and args.model == 'vgg16':
-        PATH = 'cifar100_best_model_VGG16_seed2023.pth'
+        model_path = 'cifar100_best_model_VGG16_seed2023.pth'
         model = vgg16(100).to(device)
-        checkpoint = torch.load(PATH, map_location=device)
+        checkpoint = torch.load(model_path, map_location=device)
         model.load_state_dict(checkpoint['model_state_dict'])
 # ======================================================================================================================================
 

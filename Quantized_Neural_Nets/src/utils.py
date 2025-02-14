@@ -9,6 +9,7 @@ import timm
 from scipy.optimize import curve_fit
 import pandas as pd
 import matplotlib.pyplot as plt
+from vgg_arc import vgg16
 
 from torchvision.models.resnet import BasicBlock as tBasicBlock
 from timm.models.resnet import Bottleneck as timBottleneck
@@ -200,7 +201,13 @@ def eval_sparsity(model):
 
 def finetune_model(model_path, train_loader, batch_size, num_epochs, learning_rate, device):
     
-    model = timm.create_model(model_path, pretrained=True)
+    if "resnet" in model_path.lower():
+        model = timm.create_model(model_path, pretrained=True)
+    if "vgg16" in model_path.lower():
+        model = vgg16(100).to(device)
+        checkpoint = torch.load(model_path, map_location=device)
+        model.load_state_dict(checkpoint['model_state_dict'])
+    
     model.to(device)
 
     # Define optimizer & loss function
