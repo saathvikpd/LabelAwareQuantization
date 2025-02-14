@@ -5,6 +5,7 @@ import os
 import csv
 # ======================================================================================================================================
 import timm
+from vgg_arc import vgg16
 # ======================================================================================================================================
 import argparse
 from datetime import datetime
@@ -94,8 +95,14 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
 # ======================================================================================================================================
     elif args.data_set == 'CIFAR100' and args.model == 'resnet50':
         model_path = "hf_hub:anonauthors/cifar100-timm-resnet50"
+        model = timm.create_model(model_path, pretrained=True)
 
-        original_accuracy_table = {}
+# ======================================================================================================================================
+    elif args.data_set == 'CIFAR100' and args.model == 'vgg16':
+        PATH = 'cifar100_best_model_VGG16_seed2023.pth'
+        model = vgg16(100).to(device)
+        checkpoint = torch.load(PATH, map_location=device)
+        model.load_state_dict(checkpoint['model_state_dict'])
 # ======================================================================================================================================
 
 # Adding new model --- CHANGE CODE BELOW:
@@ -103,10 +110,9 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
 
         model_path = "<INSERT CIFAR100-PRETRAINED HF MODEL>"
 
-        original_accuracy_table = {}
+        
 
-    model = timm.create_model(model_path, pretrained=True)
-    
+    original_accuracy_table = {}
     model.to(device)  
     model.eval()  # turn on the evaluation mode
 
