@@ -198,8 +198,24 @@ def eval_sparsity(model):
             num_of_zero += l.bias.eq(0).sum().item()
     return np.around(num_of_zero / total_param, 4)
 
-def finetune_model(model, train_loader, batch_size, num_epochs, learning_rate, device):
-    # Move existing model to device
+def finetune_model(model_path, train_loader, batch_size, num_epochs, learning_rate, device):
+    # Example: handle 'resnet' or 'mobilenetv2' or other keywords in model_path
+    
+    if "resnet" in model_path.lower():
+        print(f"Loading ResNet from timm using path: {model_path}")
+        model = timm.create_model(model_path, pretrained=True)
+
+    elif "mobilenet" in model_path.lower():
+        print(f"Loading custom MobileNetV2 checkpoint: {model_path}")
+        from mobilenetv2 import MobileNetV2  # Example path to your custom code
+        model = MobileNetV2(class_num=100).to(device)
+        
+        checkpoint = torch.load(model_path, map_location=device)
+        model.load_state_dict(checkpoint['model_state_dict'])
+
+    else:
+        raise ValueError(f"Unrecognized model type in path: {model_path}. Please add a branch for it!")
+
     model.to(device)
 
     # Define optimizer & loss function
@@ -213,11 +229,11 @@ def finetune_model(model, train_loader, batch_size, num_epochs, learning_rate, d
         for images, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}"):
             images, labels = images.to(device), labels.to(device)
 
-            optimizer.zero_grad()  # Clear previous gradients
-            outputs = model(images)  # Forward pass
-            loss = criterion(outputs, labels)  # Compute loss
-            loss.backward()  # Backpropagation
-            optimizer.step()  # Update weights
+            optimizer.zero_grad()  
+            outputs = model(images)  
+            loss = criterion(outputs, labels)  
+            loss.backward()  
+            optimizer.step()  
 
             running_loss += loss.item()
 
@@ -226,6 +242,8 @@ def finetune_model(model, train_loader, batch_size, num_epochs, learning_rate, d
         
     return model
 
+        
+    return model
 
 def plot_results(csv_path, central_tendency, bits = 4, eval_type = "all"):
     df = pd.read_csv(csv_path)
@@ -278,5 +296,4 @@ def plot_results(csv_path, central_tendency, bits = 4, eval_type = "all"):
 
     return fig
 
-    
     
