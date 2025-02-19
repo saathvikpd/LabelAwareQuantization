@@ -96,6 +96,16 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
         model_path = "hf_hub:anonauthors/cifar100-timm-resnet50"
 
         original_accuracy_table = {}
+
+    elif args.data_set == 'CIFAR100' and args.model == 'mobilenet_v2':
+        from pytorch_cifar_models.mobilenetv2 import cifar100_mobilenetv2_x1_0
+    
+        # Load the CIFAR-100 pretrained MobileNetV2 from chenyaofo's repo
+        model = cifar100_mobilenetv2_x1_0(pretrained=True)
+    
+        # If you want to store known accuracy, you can put it here or keep empty
+        original_accuracy_table = {}
+
 # ======================================================================================================================================
 
 # Adding new model --- CHANGE CODE BELOW:
@@ -105,7 +115,7 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
 
         original_accuracy_table = {}
 
-    model = timm.create_model(model_path, pretrained=True)
+    #model = timm.create_model(model_path, pretrained=True)
     
     model.to(device)  
     model.eval()  # turn on the evaluation mode
@@ -195,7 +205,7 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     print(f'\nTime used for evaluation: {end_time - start_time}\n')
 
     print(f'\nFine-tuning the original model on subset\n')
-    finetuned_model = finetune_model(model_path, train_loader, batch_size, num_epochs, learning_rate, device)
+    finetuned_model = finetune_model(model, train_loader, batch_size, num_epochs, learning_rate, device)
 
     print(f'\nEvaluting the fine-tuned model to get its accuracy\n')
     finetuned_topk_accuracy = test_accuracy(finetuned_model, test_loader, device, topk)

@@ -198,9 +198,8 @@ def eval_sparsity(model):
             num_of_zero += l.bias.eq(0).sum().item()
     return np.around(num_of_zero / total_param, 4)
 
-def finetune_model(model_path, train_loader, batch_size, num_epochs, learning_rate, device):
-    
-    model = timm.create_model(model_path, pretrained=True)
+def finetune_model(model, train_loader, batch_size, num_epochs, learning_rate, device):
+    # Move existing model to device
     model.to(device)
 
     # Define optimizer & loss function
@@ -226,6 +225,7 @@ def finetune_model(model_path, train_loader, batch_size, num_epochs, learning_ra
         print(f"Epoch [{epoch+1}/{num_epochs}] - Loss: {avg_loss:.4f}")
         
     return model
+
 
 def plot_results(csv_path, central_tendency, bits = 4, eval_type = "all"):
     df = pd.read_csv(csv_path)
