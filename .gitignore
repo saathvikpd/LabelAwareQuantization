@@ -1,3 +1,4 @@
 Quantized_Neural_Nets/quantized_models/
 Quantized_Neural_Nets/data/
 core
+Quantized_Neural_Nets/src/.ipynb_checkpoints/vgg_arc-checkpoint.py
