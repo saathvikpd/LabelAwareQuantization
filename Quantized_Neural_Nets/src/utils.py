@@ -9,7 +9,6 @@ import timm
 from scipy.optimize import curve_fit
 import pandas as pd
 import matplotlib.pyplot as plt
-from vgg_arc import vgg16
 
 from torchvision.models.resnet import BasicBlock as tBasicBlock
 from timm.models.resnet import Bottleneck as timBottleneck
@@ -19,13 +18,27 @@ from torchvision.models.googlenet import BasicConv2d, Inception, InceptionAux
 from torchvision.models.efficientnet import Conv2dNormActivation, SqueezeExcitation, MBConv 
 from torchvision.models.mobilenetv2 import InvertedResidual
 
-SUPPORTED_LAYER_TYPE = {nn.Linear, nn.Conv2d}
-SUPPORTED_BLOCK_TYPE = {nn.Sequential, 
+from bsconv.pytorch.common import ConvBlock
+from bsconv.pytorch.mobilenet import LinearBottleneck
+
+SUPPORTED_LAYER_TYPE = {nn.Linear, nn.Conv2d, nn.modules.conv.Conv2d, nn.modules.linear.Linear}
+SUPPORTED_BLOCK_TYPE = {nn.Sequential, ConvBlock,
                         tBottleneck, timBottleneck, tBasicBlock, tResNet,
                         BasicConv2d, Inception, InceptionAux,
+                        LinearBottleneck,
                         Conv2dNormActivation, SqueezeExcitation, MBConv,
-                        InvertedResidual
+                        InvertedResidual, nn.modules.container.Sequential
                         }
+
+
+# SUPPORTED_LAYER_TYPE = {nn.Linear, nn.Conv2d, nn.modules.conv.Conv2d, nn.modules.linear.Linear}
+# SUPPORTED_BLOCK_TYPE = {nn.Sequential, ConvBlock,
+#                         tBottleneck, tBasicBlock, tResNet,
+#                         BasicConv2d, Inception, InceptionAux,
+#                         LinearBottleneck,
+#                         Conv2dNormActivation, SqueezeExcitation, MBConv,
+#                         InvertedResidual, 
+#                         }
 
 class InterruptException(Exception):
     pass
@@ -199,15 +212,9 @@ def eval_sparsity(model):
             num_of_zero += l.bias.eq(0).sum().item()
     return np.around(num_of_zero / total_param, 4)
 
-def finetune_model(model_path, train_loader, batch_size, num_epochs, learning_rate, device):
+def finetune_model(load_model, train_loader, batch_size, num_epochs, learning_rate, device):
     
-    if "resnet" in model_path.lower():
-        model = timm.create_model(model_path, pretrained=True)
-    if "vgg16" in model_path.lower():
-        model = vgg16(100).to(device)
-        checkpoint = torch.load(model_path, map_location=device)
-        model.load_state_dict(checkpoint['model_state_dict'])
-    
+    model = load_model() # timm.create_model(model_path, pretrained=True)
     model.to(device)
 
     # Define optimizer & loss function
@@ -229,15 +236,19 @@ def finetune_model(model_path, train_loader, batch_size, num_epochs, learning_ra
 
             running_loss += loss.item()
 
+            del images, labels, outputs, loss
+            torch.cuda.empty_cache()
+
         avg_loss = running_loss / len(train_loader)
         print(f"Epoch [{epoch+1}/{num_epochs}] - Loss: {avg_loss:.4f}")
         
     return model
 
-def plot_results(csv_path, central_tendency, bits = 4, eval_type = "all"):
+def plot_results(csv_path, central_tendency, eval_type = "all"):
     df = pd.read_csv(csv_path)
-    df = df[df.Bits == bits].reset_index(drop = True)
-    model_name = csv_path.split("_")[-1].split(".")[0]
+    # df = df[df.Bits == bits].reset_index(drop = True)
+    model_name = csv_path.split("_")[-2]#.split(".")[0]
+    bits = csv_path.split("_")[-1].split(".")[0]
 
     def func(x, a, b, c):
         return (a * np.log(b * x)) + c
@@ -263,6 +274,8 @@ def plot_results(csv_path, central_tendency, bits = 4, eval_type = "all"):
     for c in cycle:
     
         X, y = df[f"{replace[0]}_KL"], df[f"{c} Top1 Accuracy{replace[1]}"]
+
+        # print(X.shape, y.shape)
         
         coefs, pcov = curve_fit(func, X, y)
         
@@ -274,14 +287,19 @@ def plot_results(csv_path, central_tendency, bits = 4, eval_type = "all"):
         
         plt.scatter(X, y, s = 5)
         plt.plot(range(len(fitted_line)), fitted_line, '--')
-    
+# plt.scatter(df["Avg_KL"], df["Original Top1 Accuracy"], s = 5)
+# plt.plot(range(len(fitted_line_o)), fitted_line_o, '--')
+# plt.scatter(df["Avg_KL"], df["Fine-Tuned Top1 Accuracy"], s = 5)
+# plt.plot(range(len(fitted_line_ft)), fitted_line_ft, '--')
+# plt.scatter(df["Avg_KL"], df["Quant+FT Top1 Accuracy"], s = 5)
+# plt.plot(range(len(fitted_line_qft)), fitted_line_qft, '--')
     plt.xlabel(f"{replace[0]} KL Divergence")
     plt.ylabel("Top-1 Accuracy")
     plt.xlim(0, 100)
     plt.ylim(0.5, 1)
     plt.title(f"Performance Of GPFQ-Quantized {model_name} On CIFAR100 Subsets", fontsize = 12)
     leg = plt.legend(["Quant", "-> fitted curve", "Original", "-> fitted curve",  "Fine-Tuned", "-> fitted curve",  "Quant + Fine-Tuned", "-> fitted curve"])
-    plt.savefig(f"./plots/{model_name}_{bits}bit_{eval_type.lower()}_{central_tendency.lower()}.png")
+    plt.savefig(f"./plots/{model_name}_{bits}_{eval_type.lower()}_{central_tendency.lower()}.png")
 
     return fig
 
