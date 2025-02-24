@@ -133,8 +133,8 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
         def load_model():
 
             model_path = 'cifar100_best_model_VGG16_seed2023.pth'
-            model = vgg16(100).to(device)
-            checkpoint = torch.load(model_path, map_location=device)
+            model = vgg16(100)
+            checkpoint = torch.load(model_path, map_location='cpu')
             model.load_state_dict(checkpoint['model_state_dict'])
 
             return model
@@ -213,7 +213,7 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
                                     retain_rate=args.retain_rate,
                                     stochastic_quantization=stochastic,
                                     device = device,
-                                    mixed_precision = args.mixed_precision
+                                    # mixed_precision = args.mixed_precision
                                     )
     start_time = datetime.now()
     quantized_model = quantizer.quantize_network()
@@ -286,7 +286,7 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
                                     retain_rate=args.retain_rate,
                                     stochastic_quantization=stochastic,
                                     device = device,
-                                    mixed_precision = args.mixed_precision
+                                    # mixed_precision = args.mixed_precision
                                     )
 
     quantized_finetuned_model = quantizer_finetuned.quantize_network()
