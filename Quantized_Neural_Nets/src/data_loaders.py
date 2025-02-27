@@ -107,32 +107,58 @@ def data_loader(ds_name, batch_size, num_workers, subset = None):
                              num_workers=num_workers)
 
 # ======================================================================================================================================
+    # Add to data_loaders.py in the CIFAR100 section
+    # Add this after the transforms section for CIFAR100:
     elif ds_name == 'CIFAR100':
         data_dir = '../data/CIFAR100/'
-
-        tr_normalize = transforms.Normalize(
-            mean=[0.485, 0.456, 0.406], std=[0.228, 0.224, 0.225])
-        transforms_curr = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            tr_normalize])
         
-        train_ds = CIFAR100(data_dir, train=True, download=True, transform=transforms_curr)
-        test_ds = CIFAR100(data_dir, train=False, download=True, transform=transforms_curr)
-
+        # Check if we're using GoogleNet
+        import sys
+        is_googlenet = 'googlenet' in sys.argv
+        
+        if is_googlenet:
+            # Use correct preprocessing for GoogleNet
+            print("Using correct GoogleNet preprocessing")
+            transform_train = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5070751592371323, 0.48654887331495095, 0.4409178433670343), 
+                                    (0.2673342858792401, 0.2564384629170883, 0.27615047132568404))
+            ])
+            transform_test = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5070751592371323, 0.48654887331495095, 0.4409178433670343), 
+                                    (0.2673342858792401, 0.2564384629170883, 0.27615047132568404))
+            ])
+        else:
+            # Standard transforms for other models
+            transform_train = transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.228, 0.224, 0.225])
+            ])
+            transform_test = transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.228, 0.224, 0.225])
+            ])
+        
+        # Create datasets and dataloaders
+        train_ds = CIFAR100(data_dir, train=True, download=True, transform=transform_train)
+        test_ds = CIFAR100(data_dir, train=False, download=True, transform=transform_test)
+        
         if subset is not None:
             train_tar = train_ds.targets
             test_tar = test_ds.targets
     
             train_subset = np.where(np.isin(np.array(train_tar), np.array(subset)))[0]
             test_subset = np.where(np.isin(np.array(test_tar), np.array(subset)))[0]
-
             train_ds = Subset(train_ds, train_subset)
             test_ds = Subset(test_ds, test_subset)
-
-        train_dl = DataLoader(dataset = train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-        test_dl = DataLoader(dataset = test_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+        
+        train_dl = DataLoader(dataset=train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+        test_dl = DataLoader(dataset=test_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 # ======================================================================================================================================
 
     else:
