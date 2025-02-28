@@ -5,6 +5,10 @@ import scipy.io as sio
 import os
 import pickle
 from tqdm import tqdm
+import timm
+from scipy.optimize import curve_fit
+import pandas as pd
+import matplotlib.pyplot as plt
 
 from torchvision.models.resnet import BasicBlock as tBasicBlock
 from timm.models.resnet import Bottleneck as timBottleneck
@@ -14,13 +18,36 @@ from torchvision.models.googlenet import BasicConv2d, Inception, InceptionAux
 from torchvision.models.efficientnet import Conv2dNormActivation, SqueezeExcitation, MBConv 
 from torchvision.models.mobilenetv2 import InvertedResidual
 
-SUPPORTED_LAYER_TYPE = {nn.Linear, nn.Conv2d}
-SUPPORTED_BLOCK_TYPE = {nn.Sequential, 
+from bsconv.pytorch.common import ConvBlock
+from bsconv.pytorch.mobilenet import LinearBottleneck
+
+SUPPORTED_LAYER_TYPE = {nn.Linear, nn.Conv2d, nn.modules.conv.Conv2d, nn.modules.linear.Linear}
+SUPPORTED_BLOCK_TYPE = {nn.Sequential, ConvBlock,
                         tBottleneck, timBottleneck, tBasicBlock, tResNet,
                         BasicConv2d, Inception, InceptionAux,
+                        LinearBottleneck,
                         Conv2dNormActivation, SqueezeExcitation, MBConv,
-                        InvertedResidual
+                        InvertedResidual, nn.modules.container.Sequential
                         }
+
+def update_supported_types(model):
+    """Update supported block types based on the given model"""
+    global SUPPORTED_BLOCK_TYPE
+    # Add model-specific block types
+    for name, module in model.named_children():
+        if type(module) not in SUPPORTED_BLOCK_TYPE and not isinstance(module, tuple(SUPPORTED_LAYER_TYPE)):
+            SUPPORTED_BLOCK_TYPE.add(type(module))
+            print(f"Added block type: {type(module)}")
+
+
+# SUPPORTED_LAYER_TYPE = {nn.Linear, nn.Conv2d, nn.modules.conv.Conv2d, nn.modules.linear.Linear}
+# SUPPORTED_BLOCK_TYPE = {nn.Sequential, ConvBlock,
+#                         tBottleneck, tBasicBlock, tResNet,
+#                         BasicConv2d, Inception, InceptionAux,
+#                         LinearBottleneck,
+#                         Conv2dNormActivation, SqueezeExcitation, MBConv,
+#                         InvertedResidual, 
+#                         }
 
 class InterruptException(Exception):
     pass
@@ -69,8 +96,29 @@ def test_accuracy(model, test_dl, device, topk=(1, )):
 
         for i, k in enumerate(topk):
             topk_count[i, j] = correct_mat[:, :k].reshape(-1).sum().item()
-
     
+    topk_accuracy = topk_count.sum(axis=1) / len(test_dl.dataset)
+    return topk_accuracy
+
+def test_accuracy_sub(model, test_dl, subset, device, topk=(1, )):
+    """ 
+    Compute top k accuracy on testing dataset but only letting model pick from subset classes
+    """
+    model.eval()
+    maxk = max(topk)
+    topk_count = np.zeros((len(topk), len(test_dl)))
+    
+    for j, (x_test, target) in enumerate(tqdm(test_dl)):
+        with torch.no_grad():
+            y_pred = model(x_test.to(device))
+
+        y_pred = y_pred[:, subset]
+        topk_pred = torch.topk(y_pred, maxk, dim=1).indices.cpu().apply_(lambda x: subset[x]).to(device)
+        target = target.to(device).view(-1, 1).expand_as(topk_pred)
+        correct_mat = (target == topk_pred)
+
+        for i, k in enumerate(topk):
+            topk_count[i, j] = correct_mat[:, :k].reshape(-1).sum().item()
 
     topk_accuracy = topk_count.sum(axis=1) / len(test_dl.dataset)
     return topk_accuracy
@@ -83,18 +131,29 @@ def extract_layers(model, layer_list, supported_block_type=SUPPORTED_BLOCK_TYPE,
     Parameters
     -----------
     model: nn.Module
-        The nueral network to extrat all MLP and CNN layers
+        The neural network to extract all MLP and CNN layers
     layer_list: list
         list containing all supported layers
     '''
-    for layer in model.children():
-        if type(layer) in supported_block_type:
-            # if sequential layer, apply recursively to layers in sequential layer
-            extract_layers(layer, layer_list, supported_block_type, supported_layer_type)
-        # print(type(layer)) if not list(layer.children()) else print(type(layer), "not layer")
-        if not list(layer.children()) and type(layer) in supported_layer_type:
-            # if leaf node, add it to list
-            layer_list.append(layer)
+    # Check if this is a GoogleNet-like model
+    is_googlenet = 'googlenet' in model.__class__.__name__.lower()
+    
+    if is_googlenet:
+        # For GoogleNet, use named_modules to get all layers regardless of nesting
+        for name, layer in model.named_modules():
+            if type(layer) in supported_layer_type:
+                if layer not in layer_list:  # Avoid duplicates
+                    layer_list.append(layer)
+                    print(f"Added layer: {name}")
+    else:
+        # Regular extraction for other models
+        for layer in model.children():
+            if type(layer) in supported_block_type:
+                # if sequential layer, apply recursively to layers in sequential layer
+                extract_layers(layer, layer_list, supported_block_type, supported_layer_type)
+            if not list(layer.children()) and type(layer) in supported_layer_type:
+                # if leaf node, add it to list
+                layer_list.append(layer)
 
 # ======================================================================================================================================
 
@@ -173,42 +232,96 @@ def eval_sparsity(model):
             num_of_zero += l.bias.eq(0).sum().item()
     return np.around(num_of_zero / total_param, 4)
 
-def test_accuracy_sub(model, test_dl, subset, device, topk=(1, )):
-    """ 
-    Compute top k accuracy on testing dataset but only letting model pick from subset classes
-    """
-    model.eval()
-    maxk = max(topk)
-    topk_count = np.zeros((len(topk), len(test_dl)))
+def finetune_model(load_model, train_loader, batch_size, num_epochs, learning_rate, device):
     
-    for j, (x_test, target) in enumerate(tqdm(test_dl)):
-        with torch.no_grad():
-            y_pred = model(x_test.to(device))
+    model = load_model() # timm.create_model(model_path, pretrained=True)
+    model.to(device)
 
-        # Filter predictions to only consider subset classes
-        y_pred_subset = y_pred[:, subset]
-        
-        # Get indices of top predictions in subset space
-        topk_indices = torch.topk(y_pred_subset, maxk, dim=1).indices
-        
-        # Map back to original class indices
-        topk_pred = torch.zeros_like(topk_indices)
-        for i, indices in enumerate(topk_indices):
-            for k, idx in enumerate(indices):
-                topk_pred[i, k] = subset[idx]
-        
-        # Move to device and expand target for comparison
-        topk_pred = topk_pred.to(device)
-        target = target.to(device).view(-1, 1).expand_as(topk_pred)
-        
-        # Check for correct predictions
-        correct_mat = (target == topk_pred)
+    # Define optimizer & loss function
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 
-        # Count correct predictions for each k
-        for i, k in enumerate(topk):
-            topk_count[i, j] = correct_mat[:, :k].reshape(-1).sum().item()
+    # Fine-tuning loop
+    model.train()
+    for epoch in range(num_epochs):
+        running_loss = 0.0
+        for images, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}"):
+            images, labels = images.to(device), labels.to(device)
 
-    # Calculate accuracy
-    topk_accuracy = topk_count.sum(axis=1) / len(test_dl.dataset)
-    return topk_accuracy
-                
+            optimizer.zero_grad()  # Clear previous gradients
+            outputs = model(images)  # Forward pass
+            loss = criterion(outputs, labels)  # Compute loss
+            loss.backward()  # Backpropagation
+            optimizer.step()  # Update weights
+
+            running_loss += loss.item()
+
+            del images, labels, outputs, loss
+            torch.cuda.empty_cache()
+
+        avg_loss = running_loss / len(train_loader)
+        print(f"Epoch [{epoch+1}/{num_epochs}] - Loss: {avg_loss:.4f}")
+        
+    return model
+
+def plot_results(csv_path, central_tendency, eval_type = "all"):
+    df = pd.read_csv(csv_path)
+    # df = df[df.Bits == bits].reset_index(drop = True)
+    model_name = csv_path.split("_")[-2]#.split(".")[0]
+    bits = csv_path.split("_")[-1].split(".")[0]
+
+    def func(x, a, b, c):
+        return (a * np.log(b * x)) + c
+
+    replace = []
+    if central_tendency.lower() == "avg":
+        replace += ["Avg"]
+    elif central_tendency.lower() == "median":
+        replace += ["Median"]
+    else:
+        replace = None
+
+    if eval_type.lower() == "all":
+        replace += [""]
+    elif eval_type.lower() == "sub":
+        replace += [" (Pick Sub)"]
+    else:
+        replace = None
+
+
+    cycle = ["Quantized", "Original", "Fine-Tuned", "Quant+FT"]
+    fig = plt.figure(figsize = (8, 5))
+    for c in cycle:
+    
+        X, y = df[f"{replace[0]}_KL"], df[f"{c} Top1 Accuracy{replace[1]}"]
+
+        # print(X.shape, y.shape)
+        
+        coefs, pcov = curve_fit(func, X, y)
+        
+        fitted_line = []
+        for i in range(100):
+            fitted_line += [func(i, *coefs).item()]
+        
+        
+        
+        plt.scatter(X, y, s = 5)
+        plt.plot(range(len(fitted_line)), fitted_line, '--')
+# plt.scatter(df["Avg_KL"], df["Original Top1 Accuracy"], s = 5)
+# plt.plot(range(len(fitted_line_o)), fitted_line_o, '--')
+# plt.scatter(df["Avg_KL"], df["Fine-Tuned Top1 Accuracy"], s = 5)
+# plt.plot(range(len(fitted_line_ft)), fitted_line_ft, '--')
+# plt.scatter(df["Avg_KL"], df["Quant+FT Top1 Accuracy"], s = 5)
+# plt.plot(range(len(fitted_line_qft)), fitted_line_qft, '--')
+    plt.xlabel(f"{replace[0]} KL Divergence")
+    plt.ylabel("Top-1 Accuracy")
+    plt.xlim(0, 100)
+    plt.ylim(0.5, 1)
+    plt.title(f"Performance Of GPFQ-Quantized {model_name} On CIFAR100 Subsets", fontsize = 12)
+    leg = plt.legend(["Quant", "-> fitted curve", "Original", "-> fitted curve",  "Fine-Tuned", "-> fitted curve",  "Quant + Fine-Tuned", "-> fitted curve"])
+    plt.savefig(f"./plots/{model_name}_{bits}_{eval_type.lower()}_{central_tendency.lower()}.png")
+
+    return fig
+
+    
+    
