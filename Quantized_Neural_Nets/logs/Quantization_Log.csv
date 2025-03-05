@@ -1,4 +1,0 @@
-Model Name,Dataset,Quantization Batch Size,Original Top1 Accuracy,Quantized Top1 Accuracy,Original Top5 Accuracy,Quantized Top5 Accuracy,Bits,MLP_Alphabet_Scalar,CNN_Alphabet_Scalar,MLP_Percentile,CNN_Percentile,Stochastic Quantization,Regularizer,Lambda,Original Sparsity,Quantized Sparsity,Retain_rate,Fusion,Seed
-resnet50,CIFAR100,256,0.8262,0.8263,0.9673,0.9674,4,1.16,1.16,1,1,False,,0.1,0.0,0.6919,0.25,False,0
-resnet50,CIFAR100,256,0.8262,0.6605,0.9673,0.9053,4,1.16,1.16,1,1,False,,0.1,0.0,0.4832,0.25,False,0
-resnet50,CIFAR100,256,0.8262,0.7376,0.9673,0.9361,8,1.16,1.16,1,1,False,,0.1,0.0,0.1258,0.25,False,0
