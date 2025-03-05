@@ -3,6 +3,7 @@ import torchvision
 import numpy as np
 import os
 import csv
+import re
 # ======================================================================================================================================
 import timm
 # ======================================================================================================================================
@@ -13,6 +14,8 @@ from utils import test_accuracy, eval_sparsity, fusion_layers_inplace, get_all_l
 from data_loaders import data_loader
 from cifar100_subset_generation import generate_subset, class_names
 import pandas as pd
+from vgg_arc import vgg16
+import bsconv.pytorch
 
 LOG_FILE_NAME = '../logs/Quantization_Log.csv'
 
@@ -31,9 +34,11 @@ parser.add_argument('--num_worker', '-w', default=8, type=int,
                     help='number of workers for data loader')
 parser.add_argument('--data_set', '-ds', default='ILSVRC2012', choices=['ILSVRC2012', 'CIFAR10', 'CIFAR100'],
                     help='dataset used for quantization')
+parser.add_argument('--use_existing', '-ue', action='store_true', help='use existing subsets')
 parser.add_argument('-model', default='resnet18', help='model name')
 parser.add_argument('--subset_size', '-sn', default=None, type=int)
 parser.add_argument('--similar_classes', '-sc', default=None, choices=["True", "False", "None"])
+parser.add_argument('--mixed_precision', '-mp', default=None, choices=["Asc", "Desc", "None"])
 parser.add_argument('--stochastic_quantization', '-sq', action='store_true',
                     help='use stochastic quantization')
 parser.add_argument('--retain_rate', '-rr', default=0.25, type=float,
@@ -49,8 +54,19 @@ parser.add_argument('--fusion', '-f', action='store_true', help='fusing CNN and 
 
 args = parser.parse_args()
 args.similar_classes = True if args.similar_classes == "True" else (False if args.similar_classes == "False" else None)
+args.mixed_precision = True if args.mixed_precision == "Asc" else (False if args.mixed_precision == "Desc" else None)
 
-LOG_FILE_SUB_NAME = f'../logs/Quantization_Log_{args.model}.csv'
+LOG_FILE_SUB_NAME = f'../logs/Quantization_Log_{args.model}_{args.bits[0]}bit.csv'
+
+
+if args.mixed_precision is not None:
+    temp = LOG_FILE_SUB_NAME.split("_")
+    add_tag = "mpasc" if args.mixed_precision else "mp"
+    temp[-1] = add_tag + temp[-1]
+    LOG_FILE_SUB_NAME = "_".join(temp)
+
+
+print(LOG_FILE_SUB_NAME)
 
 def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     batch_size = bs  
@@ -91,22 +107,61 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
 
         original_accuracy_table = {}
 
-# ======================================================================================================================================
     elif args.data_set == 'CIFAR100' and args.model == 'resnet50':
-        model_path = "hf_hub:anonauthors/cifar100-timm-resnet50"
+
+        def load_model():
+            model_path = "hf_hub:anonauthors/cifar100-timm-resnet50"
+            
+            model = timm.create_model(model_path, pretrained=True)
+
+            return model
 
         original_accuracy_table = {}
-# ======================================================================================================================================
 
-# Adding new model --- CHANGE CODE BELOW:
-    elif args.data_set == 'CIFAR100' and args.model == '<INSERT MODEL NAME>':
+    elif args.data_set == 'CIFAR100' and args.model == 'mobilenet':
 
-        model_path = "<INSERT CIFAR100-PRETRAINED HF MODEL>"
+        def load_model():
+
+            model_path = 'cifar_mobilenetv2_w1'
+            model = bsconv.pytorch.get_model(model_path, num_classes=100)
+
+            return model
 
         original_accuracy_table = {}
 
-    model = timm.create_model(model_path, pretrained=True)
-    
+    elif args.data_set == 'CIFAR100' and args.model == 'vgg16':
+
+
+        def load_model():
+
+            model_path = 'cifar100_best_model_VGG16_seed2023.pth'
+            model = vgg16(100).to(device)
+            checkpoint = torch.load(model_path, map_location=device)
+            model.load_state_dict(checkpoint['model_state_dict'])
+
+            return model
+
+        original_accuracy_table = {}
+
+    elif args.data_set == 'CIFAR100' and args.model == 'densenet':
+
+
+        def load_model():
+
+            model_path = "hf_hub:edadaltocg/densenet121_cifar100"
+            model = timm.create_model(model_path, pretrained=True)
+
+            return model
+
+        original_accuracy_table = {}
+
+
+
+    model = load_model()
+
+    # print(model.state_dict()["backbone.init_conv.conv.weight"].norm())
+
+
     model.to(device)  
     model.eval()  # turn on the evaluation mode
 
@@ -128,7 +183,35 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     
     # load the data loader for training and testing
     if args.subset_size is not None:
-        subset_info = generate_subset(args.subset_size, similar_classes = args.similar_classes)
+        if not args.use_existing:
+            subset_info = generate_subset(args.subset_size, similar_classes = args.similar_classes)
+        else:
+
+            existing_csvs = os.listdir("../logs/")
+            existing_csvs = list(filter(lambda x: ".csv" in x, existing_csvs))
+            chosen_path = existing_csvs[0]
+
+            print(chosen_path)
+            
+            ref_df = pd.read_csv(f"../logs/{chosen_path}")
+            
+            try:
+                curr_df = pd.read_csv(LOG_FILE_SUB_NAME)
+                curr_index = curr_df.shape[0]
+            except:
+                curr_index = 0
+    
+            subset_info = {}
+            subset_info["classes"] = ref_df["Subset_Inds"].iloc[curr_index]
+            subset_info["min_dist"] = ref_df["Min_KL"].iloc[curr_index]
+            subset_info["max_dist"] = ref_df["Max_KL"].iloc[curr_index]
+            subset_info["avg_dist"] = ref_df["Avg_KL"].iloc[curr_index]
+            subset_info["median_dist"] = ref_df["Median_KL"].iloc[curr_index]
+    
+            subset_info["classes"] = list(map(lambda x: int(x), re.findall(r"[0-9]+", subset_info["classes"])))
+    
+            print(subset_info["classes"], type(subset_info["classes"]))
+            
         train_loader, test_loader = data_loader(args.data_set, batch_size, args.num_worker, subset = subset_info["classes"])
     else:
         train_loader, test_loader = data_loader(args.data_set, batch_size, args.num_worker)
@@ -149,7 +232,8 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
                                     lamb=lamb,
                                     retain_rate=args.retain_rate,
                                     stochastic_quantization=stochastic,
-                                    device = device
+                                    device = device,
+                                    mixed_precision = args.mixed_precision
                                     )
     start_time = datetime.now()
     quantized_model = quantizer.quantize_network()
@@ -192,16 +276,28 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
 
     end_time = datetime.now()
 
+
     print(f'\nTime used for evaluation: {end_time - start_time}\n')
 
+    original_sparsity = eval_sparsity(model)
+    quantized_sparsity = eval_sparsity(quantized_model)
+
+    del model, quantized_model
+    # del train_loader, test_loader
+
     print(f'\nFine-tuning the original model on subset\n')
-    finetuned_model = finetune_model(model_path, train_loader, batch_size, num_epochs, learning_rate, device)
+
+    # train_loader, test_loader = data_loader(args.data_set, 8, args.num_worker, subset = subset_info["classes"])
+    
+    finetuned_model = finetune_model(load_model, train_loader, batch_size, num_epochs, learning_rate, device)
 
     print(f'\nEvaluting the fine-tuned model to get its accuracy\n')
     finetuned_topk_accuracy = test_accuracy(finetuned_model, test_loader, device, topk)
     finetuned_topk_accuracy_sub = test_accuracy_sub(finetuned_model, test_loader, subset_info["classes"], device, topk)
     print(f'Top-1 & Top-5 accuracies of fine-tuned {args.model} is {finetuned_topk_accuracy[0]} & {finetuned_topk_accuracy[1]}.')
     print(f'Top-1 & Top-5 accuracies of fine-tuned {args.model}, picking from subset classes, is {finetuned_topk_accuracy_sub[0]} & {finetuned_topk_accuracy_sub[1]}.')
+
+    train_loader, test_loader = data_loader(args.data_set, batch_size, args.num_worker, subset = subset_info["classes"])
 
     print(f'\nQuantizing the fine-tuned model on subset\n')
     quantizer_finetuned = QuantizeNeuralNet(finetuned_model, args.model, batch_size, 
@@ -217,7 +313,8 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
                                     lamb=lamb,
                                     retain_rate=args.retain_rate,
                                     stochastic_quantization=stochastic,
-                                    device = device
+                                    device = device,
+                                    mixed_precision = args.mixed_precision
                                     )
 
     quantized_finetuned_model = quantizer_finetuned.quantize_network()
@@ -229,9 +326,7 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     print(f'Top-1 & Top-5 accuracies of quantized + fine-tuned {args.model} is {quant_ft_topk_accuracy[0]} & {quant_ft_topk_accuracy[1]}.')
     print(f'Top-1 & Top-5 accuracies of quantized + fine-tuned {args.model}, picking from subset classes, is {quant_ft_topk_accuracy_sub[0]} & {quant_ft_topk_accuracy_sub[1]}.')
     
-
-    original_sparsity = eval_sparsity(model)
-    quantized_sparsity = eval_sparsity(quantized_model)
+    
     finetuned_sparsity = eval_sparsity(finetuned_model)
     quantized_finetuned_sparsity = eval_sparsity(quantized_finetuned_model)
     
