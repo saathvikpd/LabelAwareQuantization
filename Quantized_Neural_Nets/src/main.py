@@ -14,7 +14,6 @@ from utils import test_accuracy, eval_sparsity, fusion_layers_inplace, get_all_l
 from data_loaders import data_loader
 from cifar100_subset_generation import generate_subset, class_names
 import pandas as pd
-from vgg_arc import vgg16
 import bsconv.pytorch
 
 LOG_FILE_NAME = '../logs/Quantization_Log.csv'
