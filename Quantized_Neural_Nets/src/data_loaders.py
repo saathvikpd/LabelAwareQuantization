@@ -45,9 +45,31 @@ class Imagenet(Dataset):
         return x, y
 
 
-def data_loader(ds_name, batch_size, num_workers, subset = None): 
+def data_loader(ds_name, batch_size, num_workers, subset=None, full_test=False): 
     """
     Prepare data loaders
+    
+    Parameters:
+    -----------
+    ds_name : str
+        Dataset name ('ILSVRC2012', 'CIFAR10', or 'CIFAR100')
+    batch_size : int
+        Batch size for data loaders
+    num_workers : int
+        Number of workers for data loading
+    subset : list, optional
+        List of class indices to include in the dataset
+    full_test : bool, optional
+        If True, returns a full test loader in addition to subset loaders
+        
+    Returns:
+    --------
+    If full_test is False and subset is not None:
+        train_dl, test_dl (subset data only)
+    If full_test is True and subset is not None:
+        train_dl, subset_test_dl, full_test_dl
+    If subset is None:
+        train_dl, test_dl (full data)
     """
     if ds_name == 'ILSVRC2012':
         data_dir = '../data/ILSVRC2012'  # customize the data path before run the code 
@@ -121,6 +143,11 @@ def data_loader(ds_name, batch_size, num_workers, subset = None):
         train_ds = CIFAR100(data_dir, train=True, download=True, transform=transforms_curr)
         test_ds = CIFAR100(data_dir, train=False, download=True, transform=transforms_curr)
 
+        # Always create the full test loader if full_test is True
+        if full_test:
+            full_test_dl = DataLoader(dataset=test_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+        # Create subset loaders if subset is provided
         if subset is not None:
             train_tar = train_ds.targets
             test_tar = test_ds.targets
@@ -128,14 +155,26 @@ def data_loader(ds_name, batch_size, num_workers, subset = None):
             train_subset = np.where(np.isin(np.array(train_tar), np.array(subset)))[0]
             test_subset = np.where(np.isin(np.array(test_tar), np.array(subset)))[0]
 
-            train_ds = Subset(train_ds, train_subset)
-            test_ds = Subset(test_ds, test_subset)
+            subset_train_ds = Subset(train_ds, train_subset)
+            subset_test_ds = Subset(test_ds, test_subset)
 
-        train_dl = DataLoader(dataset = train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-        test_dl = DataLoader(dataset = test_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+            train_dl = DataLoader(dataset=subset_train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+            subset_test_dl = DataLoader(dataset=subset_test_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+            
+            # Return both subset and full test loaders if requested
+            if full_test:
+                return train_dl, subset_test_dl, full_test_dl
+            else:
+                return train_dl, subset_test_dl
+        else:
+            # No subset specified, just return the full loaders
+            train_dl = DataLoader(dataset=train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+            test_dl = DataLoader(dataset=test_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+            return train_dl, test_dl
 # ======================================================================================================================================
 
     else:
-        raise Exception('Unkown dataset!')
+        raise Exception('Unknown dataset!')
 
-    return train_dl, test_dl 
+    # Default return for non-CIFAR100 datasets
+    return train_dl, test_dl

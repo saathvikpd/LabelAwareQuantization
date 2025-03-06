@@ -211,10 +211,16 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     
             print(subset_info["classes"], type(subset_info["classes"]))
             
-        train_loader, test_loader = data_loader(args.data_set, batch_size, args.num_worker, subset = subset_info["classes"])
+        # Get both subset and full dataset loaders
+        train_loader, subset_test_loader, full_test_loader = data_loader(
+            args.data_set, batch_size, args.num_worker, 
+            subset=subset_info["classes"], full_test=True
+        )
     else:
         train_loader, test_loader = data_loader(args.data_set, batch_size, args.num_worker)
-        
+        # For consistency in variable names when subset_size is None
+        subset_test_loader = test_loader
+        full_test_loader = test_loader
         
     
     # quantize the neural net
@@ -232,7 +238,7 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
                                     retain_rate=args.retain_rate,
                                     stochastic_quantization=stochastic,
                                     device = device,
-                                    mixed_precision = args.mixed_precision
+                                    #mixed_precision = args.mixed_precision
                                     )
     start_time = datetime.now()
     quantized_model = quantizer.quantize_network()
@@ -258,19 +264,24 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
         print(f'\nUsing the original model accuracy from pytorch.\n')
         original_topk_accuracy = original_accuracy_table[args.model]
     else:
-        print(f'\nEvaluting the original model to get its accuracy\n')
-        original_topk_accuracy = test_accuracy(model, test_loader, device, topk)
-        original_topk_accuracy_sub = test_accuracy_sub(model, test_loader, subset_info["classes"], device, topk)
+        print(f'\nEvaluating the original model to get its accuracy\n')
+        # Evaluate on full dataset
+        original_topk_accuracy = test_accuracy(model, full_test_loader, device, topk)
+        # Evaluate on subset classes only
+        original_topk_accuracy_sub = test_accuracy_sub(model, subset_test_loader, subset_info["classes"], device, topk)
     
-    print(f'Top-1 & Top-5 accuracies of {args.model} is {original_topk_accuracy[0]} & {original_topk_accuracy[1]}.')
+    print(f'Top-1 & Top-5 accuracies of {args.model} on full dataset is {original_topk_accuracy[0]} & {original_topk_accuracy[1]}.')
     print(f'Top-1 & Top-5 accuracies of {args.model}, picking from subset classes, is {original_topk_accuracy_sub[0]} & {original_topk_accuracy_sub[1]}.')
     
     start_time = datetime.now()
 
-    print(f'\n Evaluting the quantized model to get its accuracy\n')
-    topk_accuracy = test_accuracy(quantized_model, test_loader, device, topk)
-    topk_accuracy_sub = test_accuracy_sub(quantized_model, test_loader, subset_info["classes"], device, topk)
-    print(f'Top-1 & Top-5 accuracies of quantized {args.model} is {topk_accuracy[0]} & {topk_accuracy[1]}.')
+    print(f'\nEvaluating the quantized model to get its accuracy\n')
+    # Evaluate on full dataset
+    topk_accuracy = test_accuracy(quantized_model, full_test_loader, device, topk)
+    # Evaluate on subset classes only
+    topk_accuracy_sub = test_accuracy_sub(quantized_model, subset_test_loader, subset_info["classes"], device, topk)
+    
+    print(f'Top-1 & Top-5 accuracies of quantized {args.model} on full dataset is {topk_accuracy[0]} & {topk_accuracy[1]}.')
     print(f'Top-1 & Top-5 accuracies of quantized {args.model}, picking from subset classes, is {topk_accuracy_sub[0]} & {topk_accuracy_sub[1]}.')
 
     end_time = datetime.now()
@@ -285,18 +296,17 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     # del train_loader, test_loader
 
     print(f'\nFine-tuning the original model on subset\n')
-
-    # train_loader, test_loader = data_loader(args.data_set, 8, args.num_worker, subset = subset_info["classes"])
     
     finetuned_model = finetune_model(load_model, train_loader, batch_size, num_epochs, learning_rate, device)
 
-    print(f'\nEvaluting the fine-tuned model to get its accuracy\n')
-    finetuned_topk_accuracy = test_accuracy(finetuned_model, test_loader, device, topk)
-    finetuned_topk_accuracy_sub = test_accuracy_sub(finetuned_model, test_loader, subset_info["classes"], device, topk)
-    print(f'Top-1 & Top-5 accuracies of fine-tuned {args.model} is {finetuned_topk_accuracy[0]} & {finetuned_topk_accuracy[1]}.')
+    print(f'\nEvaluating the fine-tuned model to get its accuracy\n')
+    # Evaluate on full dataset
+    finetuned_topk_accuracy = test_accuracy(finetuned_model, full_test_loader, device, topk)
+    # Evaluate on subset classes only
+    finetuned_topk_accuracy_sub = test_accuracy_sub(finetuned_model, subset_test_loader, subset_info["classes"], device, topk)
+    
+    print(f'Top-1 & Top-5 accuracies of fine-tuned {args.model} on full dataset is {finetuned_topk_accuracy[0]} & {finetuned_topk_accuracy[1]}.')
     print(f'Top-1 & Top-5 accuracies of fine-tuned {args.model}, picking from subset classes, is {finetuned_topk_accuracy_sub[0]} & {finetuned_topk_accuracy_sub[1]}.')
-
-    train_loader, test_loader = data_loader(args.data_set, batch_size, args.num_worker, subset = subset_info["classes"])
 
     print(f'\nQuantizing the fine-tuned model on subset\n')
     quantizer_finetuned = QuantizeNeuralNet(finetuned_model, args.model, batch_size, 
@@ -313,18 +323,20 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
                                     retain_rate=args.retain_rate,
                                     stochastic_quantization=stochastic,
                                     device = device,
-                                    mixed_precision = args.mixed_precision
+                                    #mixed_precision = args.mixed_precision
                                     )
 
     quantized_finetuned_model = quantizer_finetuned.quantize_network()
     quantized_finetuned_model = quantized_finetuned_model.to(device)
 
-    print(f'\n Evaluting the quantized + fine-tuned model to get its accuracy\n')
-    quant_ft_topk_accuracy = test_accuracy(quantized_finetuned_model, test_loader, device, topk)
-    quant_ft_topk_accuracy_sub = test_accuracy_sub(quantized_finetuned_model, test_loader, subset_info["classes"], device, topk)
-    print(f'Top-1 & Top-5 accuracies of quantized + fine-tuned {args.model} is {quant_ft_topk_accuracy[0]} & {quant_ft_topk_accuracy[1]}.')
-    print(f'Top-1 & Top-5 accuracies of quantized + fine-tuned {args.model}, picking from subset classes, is {quant_ft_topk_accuracy_sub[0]} & {quant_ft_topk_accuracy_sub[1]}.')
+    print(f'\nEvaluating the quantized + fine-tuned model to get its accuracy\n')
+    # Evaluate on full dataset
+    quant_ft_topk_accuracy = test_accuracy(quantized_finetuned_model, full_test_loader, device, topk)
+    # Evaluate on subset classes only
+    quant_ft_topk_accuracy_sub = test_accuracy_sub(quantized_finetuned_model, subset_test_loader, subset_info["classes"], device, topk)
     
+    print(f'Top-1 & Top-5 accuracies of quantized + fine-tuned {args.model} on full dataset is {quant_ft_topk_accuracy[0]} & {quant_ft_topk_accuracy[1]}.')
+    print(f'Top-1 & Top-5 accuracies of quantized + fine-tuned {args.model}, picking from subset classes, is {quant_ft_topk_accuracy_sub[0]} & {quant_ft_topk_accuracy_sub[1]}.')
     
     finetuned_sparsity = eval_sparsity(finetuned_model)
     quantized_finetuned_sparsity = eval_sparsity(quantized_finetuned_model)
