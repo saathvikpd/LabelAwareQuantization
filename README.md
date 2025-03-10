@@ -69,7 +69,6 @@ Plot description:
 
 2. **Install Requirements**:
    ```bash
-   cd ./Quantized_Neural_Nets
    pip install -r requirements.txt
    ```
 
