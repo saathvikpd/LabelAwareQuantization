@@ -12,6 +12,7 @@ This repository contains the code and resources for the DSC180 Capstone Project 
      - `cifar100_class_names.npy`: NumPy array file containing the class names for the CIFAR-100 dataset.
      - `cifar100_kl_div_matrix.npy`: NumPy array file containing the KL divergence matrix for CIFAR-100 classes.
      - `cifar100_subset_generation.py`: Python script for generating subsets of the CIFAR-100 dataset.
+- `logs/`: Log files (.csv)
 - `Class Embeddings & KL Divergence.ipynb`: Jupyter notebook analyzing class embeddings and Kullback-Leibler (KL) divergence.
  
 ## Experimental Setup
