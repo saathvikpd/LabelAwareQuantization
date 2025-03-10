@@ -37,7 +37,7 @@ The experiments utilize the CIFAR-100 dataset, which consists of 100 classes wit
    - Employ the `cifar100_subset_generation.py` script to create subsets of the CIFAR-100 dataset based on specific criteria, such as selecting classes with high or low KL divergence.
 
 3. **Quantized Neural Networks**:
-   - Explore the `Quantized_Neural_Nets/src/testing.ipynb` notebook for experiments and results on how subset homogeneity (measured by KL) impacts GPFQ Quantization of CNNs.
+   - Explore the `src/testing.ipynb` notebook for experiments and results on how subset homogeneity (measured by KL) impacts GPFQ Quantization of CNNs.
    - Train and evaluate quantized models on the original and subset datasets to assess performance impacts.
   
 ### Sample Result
