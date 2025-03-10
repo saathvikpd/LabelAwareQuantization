@@ -76,7 +76,7 @@ Plot description:
 
 3. **Run Experiment**:
     ```bash
-   python main.py -model 'resnet50' -b 4 -bs 64 -s 1.16 -ds 'CIFAR100' -sn 10 -sc 'False'
+   python main.py -model 'resnet50' -b 4 -bs 64 -s 1.16 -ds 'CIFAR100' -sn 10 -sc 'False' -ue -mp 'Asc'
    ```
     Function Parameters:
    - model: Model name (pulls pre-trained model from hugging-face)
@@ -86,3 +86,5 @@ Plot description:
    - ds: Dataset (only CIFAR100 used for our experiments)
    - sn: Subset size
    - sc: Class similarity level for random subset generation ('True': very similar, 'False': very dissimilar, 'None': random)
+   - ue: Use existing subsets for experiments
+   - mp: 'Asc' => First 50% of weights in 3-bit and second 50% of weights in 5-bit; 'Desc' => First 50% of weights in 5-bit and second 50% of weights in 3-bit
