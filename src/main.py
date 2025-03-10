@@ -10,12 +10,15 @@ import timm
 import argparse
 from datetime import datetime
 from quantize_neural_net import QuantizeNeuralNet
-from utils import test_accuracy, eval_sparsity, fusion_layers_inplace, get_all_layers, test_accuracy_sub, finetune_model
+from utils import test_accuracy, eval_sparsity, fusion_layers_inplace, get_all_layers, test_accuracy_sub, finetune_model, 
+get_training_dataloader_mobilenetv2, get_test_dataloader_mobilenetv2
 from data_loaders import data_loader
 from cifar100_subset_generation import generate_subset, class_names
 import pandas as pd
 from vgg_arc import vgg16
 import bsconv.pytorch
+from mobilenetv2 import MobileNetV2
+import detectors
 
 LOG_FILE_NAME = '../logs/Quantization_Log.csv'
 
@@ -155,6 +158,15 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
 
         original_accuracy_table = {}
 
+    elif args.data_set == 'CIFAR100' and args.model == 'mobilenetv2':
+      
+        def load_model():
+            model_path = "Sunday_23_February_2025_20h_14m_08s/mobilenetv2-200-regular.pth"
+            model = MobileNetV2()
+            model.load_state_dict(state_dict)
+            return model
+          
+        original_accuracy_table = {}
 
 
     model = load_model()
@@ -182,39 +194,55 @@ def main(b, mlp_s, cnn_s, bs, mlp_per, cnn_per, l):
     
     
     # load the data loader for training and testing
-    if args.subset_size is not None:
-        if not args.use_existing:
-            subset_info = generate_subset(args.subset_size, similar_classes = args.similar_classes)
+    if args.model != "mobilenetv2"
+        if args.subset_size is not None:
+            if not args.use_existing:
+                subset_info = generate_subset(args.subset_size, similar_classes = args.similar_classes)
+            else:
+    
+                existing_csvs = os.listdir("../logs/")
+                existing_csvs = list(filter(lambda x: ".csv" in x, existing_csvs))
+                chosen_path = existing_csvs[0]
+    
+                print(chosen_path)
+                
+                ref_df = pd.read_csv(f"../logs/{chosen_path}")
+                
+                try:
+                    curr_df = pd.read_csv(LOG_FILE_SUB_NAME)
+                    curr_index = curr_df.shape[0]
+                except:
+                    curr_index = 0
+        
+                subset_info = {}
+                subset_info["classes"] = ref_df["Subset_Inds"].iloc[curr_index]
+                subset_info["min_dist"] = ref_df["Min_KL"].iloc[curr_index]
+                subset_info["max_dist"] = ref_df["Max_KL"].iloc[curr_index]
+                subset_info["avg_dist"] = ref_df["Avg_KL"].iloc[curr_index]
+                subset_info["median_dist"] = ref_df["Median_KL"].iloc[curr_index]
+        
+                subset_info["classes"] = list(map(lambda x: int(x), re.findall(r"[0-9]+", subset_info["classes"])))
+        
+                print(subset_info["classes"], type(subset_info["classes"]))
+                
+            train_loader, test_loader = data_loader(args.data_set, batch_size, args.num_worker, subset = subset_info["classes"])
         else:
-
-            existing_csvs = os.listdir("../logs/")
-            existing_csvs = list(filter(lambda x: ".csv" in x, existing_csvs))
-            chosen_path = existing_csvs[0]
-
-            print(chosen_path)
-            
-            ref_df = pd.read_csv(f"../logs/{chosen_path}")
-            
-            try:
-                curr_df = pd.read_csv(LOG_FILE_SUB_NAME)
-                curr_index = curr_df.shape[0]
-            except:
-                curr_index = 0
-    
-            subset_info = {}
-            subset_info["classes"] = ref_df["Subset_Inds"].iloc[curr_index]
-            subset_info["min_dist"] = ref_df["Min_KL"].iloc[curr_index]
-            subset_info["max_dist"] = ref_df["Max_KL"].iloc[curr_index]
-            subset_info["avg_dist"] = ref_df["Avg_KL"].iloc[curr_index]
-            subset_info["median_dist"] = ref_df["Median_KL"].iloc[curr_index]
-    
-            subset_info["classes"] = list(map(lambda x: int(x), re.findall(r"[0-9]+", subset_info["classes"])))
-    
-            print(subset_info["classes"], type(subset_info["classes"]))
-            
-        train_loader, test_loader = data_loader(args.data_set, batch_size, args.num_worker, subset = subset_info["classes"])
+            train_loader, test_loader = data_loader(args.data_set, batch_size, args.num_worker)
     else:
-        train_loader, test_loader = data_loader(args.data_set, batch_size, args.num_worker)
+        if args.subset_size is not None:
+            subset_info = generate_subset(args.subset_size, similar_classes = args.similar_classes)
+            train_loader = get_training_dataloader_mobilenetv2(num_workers=args.num_worker, 
+                                                               batch_size=batch_size,
+                                                               subset=subset_info["classes"])
+            test_loader = get_test_dataloader_mobilenetv2(num_workers=args.num_worker, 
+                                                          batch_size=batch_size, 
+                                                          subset=subset_info["classes"])
+            labels_set = set(label for _, label in test_loader)
+        else:
+            train_loader = get_training_dataloader_mobilenetv2(num_workers=args.num_worker, 
+                                                               batch_size=batch_size)
+            test_loader = get_test_dataloader_mobilenetv2(num_workers=args.num_worker, 
+                                                          batch_size=batch_size)
         
         
     
