@@ -7,6 +7,8 @@ import pickle
 from tqdm import tqdm
 import timm
 from scipy.optimize import curve_fit
+from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Subset
 import pandas as pd
 import matplotlib.pyplot as plt
 import re
@@ -146,8 +148,65 @@ def get_all_layers(model, layer_list, indent = 0):
             get_all_layers(layer, layer_list, indent = indent + 1)
 
 # ======================================================================================================================================
+def get_training_dataloader_mobilenetv2(mean=CIFAR100_TRAIN_MEAN_MOBILENETV2, std=CIFAR100_TRAIN_STD_MOBILENETV2, batch_size=16, num_workers=2, shuffle=True, subset=None):
+    """ return training dataloader for MOBILENETV2
+    Args:
+        mean: mean of cifar100 training dataset
+        std: std of cifar100 training dataset
+        path: path to cifar100 training python dataset
+        batch_size: dataloader batchsize
+        num_workers: dataloader num_works
+        shuffle: whether to shuffle
+    Returns: train_data_loader:torch dataloader object
+    """
 
+    transform_train = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(15),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std)
+    ])
+    cifar100_training = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform=transform_train)
+    
+    if subset is not None:
+        train_tar = cifar100_training.targets
+        filtered_indices = [i for i, (_, label) in enumerate(cifar100_training) if label in subset]
+        cifar100_training = Subset(cifar100_training, filtered_indices)
+        
+    cifar100_training_loader = DataLoader(cifar100_training, shuffle=shuffle, num_workers=num_workers, batch_size=batch_size)
+    return cifar100_training_loader
+    
+# ======================================================================================================================================
+def get_test_dataloader_mobilenetv2(mean=CIFAR100_TRAIN_MEAN_MOBILENETV2, std=CIFAR100_TRAIN_STD_MOBILENETV2, batch_size=16, num_workers=2, shuffle=False, subset=None):
+    """ return training dataloader for MOBILENETV2
+    Args:
+        mean: mean of cifar100 test dataset
+        std: std of cifar100 test dataset
+        path: path to cifar100 test python dataset
+        batch_size: dataloader batchsize
+        num_workers: dataloader num_works
+        shuffle: whether to shuffle
+    Returns: cifar100_test_loader:torch dataloader object
+    """
+    transform_test = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(15),
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std)
+    ])
+    cifar100_test = torchvision.datasets.CIFAR100(root='./data', train=False, download=True, transform=transform_test)
+    
+    if subset is not None:
+        test_tar = cifar100_test.targets
+        filtered_indices = [i for i, (_, label) in enumerate(cifar100_test) if label in subset]
+        cifar100_test = Subset(cifar100_test, filtered_indices)
+        
+    cifar100_test_loader = DataLoader(cifar100_test, shuffle=shuffle, num_workers=num_workers, batch_size=batch_size)
 
+    return cifar100_test_loader
+# ======================================================================================================================================
 def fusion_layers_inplace(model, device):
     '''
     Let a convolutional layer fuse with its subsequent batch normalization layer  
