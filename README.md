@@ -6,8 +6,7 @@ This repository contains the code and resources for the DSC180 Capstone Project 
 
 ## Repository Structure
 
-- `Quantized_Neural_Nets/`: Directory containing code and scripts related to quantized neural networks.
-- `Quantized_Neural_Nets/src/`: 
+- `src/`: 
      - `plots/`: Plots from experiments
      - `testing.ipynb/`: Juypter notebook to run experiments and generate plots
      - `cifar100_class_names.npy`: NumPy array file containing the class names for the CIFAR-100 dataset.
