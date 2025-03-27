@@ -107,13 +107,15 @@ pip install -r requirements.txt
 ```bash
 python main.py -model 'resnet50' -b 4 -bs 64 -s 1.16 -ds 'CIFAR100' -sn 10 -sc 'False' -ue -mp 'Asc'
 ```
-Function Parameters:
-- model: Model name (pulls pre-trained model from hugging-face)
-- b: Bit width or precision-level
-- bs: Batch size
-- s: Scalar C used to determine the radius of alphabets
-- ds: Dataset (only CIFAR100 used for our experiments)
-- sn: Subset size
-- sc: Class similarity level for random subset generation ('True': very similar, 'False': very dissimilar, 'None': random)
-- ue: Use existing subsets for experiments
-- mp: 'Asc' => First 50% of weights in 3-bit and second 50% of weights in 5-bit; 'Desc' => First 50% of weights in 5-bit and second 50% of weights in 3-bit
+
+| 🏷️ Flag       | 🧠 Parameter                     | 📝 Description                                                                 |
+|---------------|----------------------------------|--------------------------------------------------------------------------------|
+| `-model`      | Model Name                       | Name of the model (e.g., `'resnet50'`) to load from Hugging Face or TorchHub   |
+| `-b`          | Bit Width                        | Bit precision level (e.g., `4` for 4-bit quantization)                         |
+| `-bs`         | Batch Size                       | Number of samples per batch for training/evaluation                            |
+| `-s`          | Scalar C                         | Scalar used to determine the radius of quantization alphabets                 |
+| `-ds`         | Dataset                          | Dataset to use — currently supports only `'CIFAR100'`                          |
+| `-sn`         | Subset Size                      | Number of classes to include in each subset                                    |
+| `-sc`         | Subset Similarity Condition      | Class similarity flag: `'True'` (similar), `'False'` (dissimilar), `'None'` (random) |
+| `-ue`         | Use Existing Subsets             | Whether to reuse existing generated subsets (`True` or `False`)                |
+| `-mp`         | Mixed Precision Strategy         | `'Asc'`: low→high bits, `'Desc'`: high→low bits in weight partitioning         |
