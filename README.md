@@ -9,17 +9,22 @@ We adapted the [GPFQ Quantization framework](https://github.com/YixuanSeanZhou/Q
 
 ---
 
-## 📂 Repository Structure
+## 📁 Repository Structure
 
-- `src/`: 
-     - `plots/`: Plots from experiments
-     - `testing.ipynb/`: Juypter notebook to run experiments and generate plots
-     - `cifar100_class_names.npy`: NumPy array file containing the class names for the CIFAR-100 dataset.
-     - `cifar100_kl_div_matrix.npy`: NumPy array file containing the KL divergence matrix for CIFAR-100 classes.
-     - `cifar100_subset_generation.py`: Python script for generating subsets of the CIFAR-100 dataset.
-- `logs/`: Log files (.csv)
-- `Class Embeddings & KL Divergence.ipynb`: Jupyter notebook analyzing class embeddings and Kullback-Leibler (KL) divergence.
- 
+```plaintext
+LabelAwareQuantization/
+├── 📂 src/
+│   ├── 📁 plots/                              # Experiment result plots
+│   ├── 📓 testing.ipynb                       # Main notebook to run experiments
+│   ├── 📄 cifar100_class_names.npy            # CIFAR-100 class names
+│   ├── 📄 cifar100_kl_div_matrix.npy          # KL divergence matrix
+│   ├── 🐍 cifar100_subset_generation.py       # Script to generate dataset subsets
+│   └── 🐍 main.py                             # Main script to run quantization pipeline
+├── 📂 logs/                                   # CSV log files for experiments
+├── 📓 Class Embeddings & KL Divergence.ipynb  # Embedding and KL divergence analysis
+├── 📄 requirements.txt                        # Dependencies for the project
+└── 📝 README.md                               # Project documentation
+```
 
 ---
 
