@@ -1,4 +1,4 @@
-# 🧠 Label-Aware Quantization
+# Label-Aware Quantization
 
 👥 **Contributors**: Saathvik Dirisala, Jessica Hung, Ari Juljulian, Yijun Luo  
 🔗 **Website (Result Visualizations)**: [https://saathvikpd.github.io/LabelAwareQuantWebsite](https://saathvikpd.github.io/LabelAwareQuantWebsite/)
