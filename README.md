@@ -1,6 +1,6 @@
 # 🧠 Label-Aware Quantization
 
-**Contributors**: Saathvik Dirisala, Jessica Hung, Ari Juljulian, Yijun Luo  
+👥 **Contributors**: Saathvik Dirisala, Jessica Hung, Ari Juljulian, Yijun Luo  
 🔗 **Website (Result Visualizations)**: [https://saathvikpd.github.io/LabelAwareQuantWebsite](https://saathvikpd.github.io/LabelAwareQuantWebsite/)
 
 This repository contains code and resources for the **DSC180 Capstone Project** on *Label-Aware Quantization*. The project explores **post-training quantization techniques** in neural networks with an emphasis on label and class similarity awareness.
